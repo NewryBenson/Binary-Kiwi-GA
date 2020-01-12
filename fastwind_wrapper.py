@@ -800,7 +800,7 @@ def init_setup(theoutdir):
 
     rundir = theoutdir + 'run/'
     savedir = theoutdir + 'saved/'
-    indir = theoutdir + 'input/'
+    indir = theoutdir + 'input_copy/'
     for adir in (theoutdir, rundir, savedir, indir):
         mkdir(adir)
     return theoutdir, rundir, savedir, indir
