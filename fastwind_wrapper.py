@@ -66,8 +66,8 @@ def read_control_pars(control_source):
     ctrldct["mut_rate_factor"] = float(ctrldct["mut_rate_factor"])
     ctrldct["fit_cutoff_min_carb"] = float(ctrldct["fit_cutoff_min_carb"])
     ctrldct["fit_cutoff_max_carb"] = float(ctrldct["fit_cutoff_max_carb"])
-    ctrldct["cuttoff_increase_genv"] = float(ctrldct["cuttoff_increase_genv"])
-    ctrldct["cuttoff_decrease_genv"] = float(ctrldct["cuttoff_decrease_genv"])
+    ctrldct["cutoff_increase_genv"] = float(ctrldct["cutoff_increase_genv"])
+    ctrldct["cutoff_decrease_genv"] = float(ctrldct["cutoff_decrease_genv"])
 
     return ctrldct
 

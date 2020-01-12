@@ -12,8 +12,8 @@ doerr_factor          1.5                   # parameter for Doerr mutation
 mut_rate_min          0.001                 # minimum mutation rate for 'carbonneau' and 'genvariety'
 mut_rate_max          0.25                  # maximum mutation rate for 'carbonneau' and 'genvariety'
 mut_rate_factor       1.5                   # factor of mutation rate change for 'carbonneau' and 'genvariety'
-fit_cuttof_min_carb   0.60                  # minimum fitness cutoff 'carbonneau'
-fit_cuttof_max_carb   0.90                  # maximum fitness cutoff 'carbonneau'
-cuttof_increase_genv  1.0                   # cutoff increase mutation rate 'genvariety'
-cuttof_decrease_genv  3.0                   # cutoff decrease mutation rate 'genvariety'
+fit_cutoff_min_carb   0.60                  # minimum fitness cutoff 'carbonneau'
+fit_cutoff_max_carb   0.90                  # maximum fitness cutoff 'carbonneau'
+cutoff_increase_genv  1.0                   # cutoff increase mutation rate 'genvariety'
+cutoff_decrease_genv  3.0                   # cutoff decrease mutation rate 'genvariety'
 be_verbose     	      True                  # specify verbosity
