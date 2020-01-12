@@ -7,7 +7,6 @@ import argparse
 import functools
 # from schwimmbad import MultiPool
 
-# import control as ctrl
 import paths as paths
 import population as pop
 import fastwind_wrapper as fw
@@ -46,7 +45,7 @@ fw.remove_old_output(fd)
 # #FIXME: many functions have specific lookups into this
 # dictionary as an input, this can be replaced by calling this
 # dictionary only once, and then within the function looking
-# up the values. 
+# up the values.
 cdict = fw.read_control_pars(fd["control_in"])
 
 ''' READ INPUT PARAMETERS AND DATA '''
