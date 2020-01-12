@@ -11,20 +11,21 @@ RUNNAME=zeta_per_test
 
 # In the future this has to be fixed by using MPI-copy!
 # This disk can get full!!
-TMPDIR=/nfs/scratch/$myusername/pyEA
-if [ ! -d "${TMPDIR}" ]; then mkdir ${TMPDIR} ; fi
+# TMPDIR=/nfs/scratch/$myusername/pyEA
+# if [ ! -d "${TMPDIR}" ]; then mkdir ${TMPDIR} ; fi
 
 module load 2019
 module load pre2019
-#module load mpicopy
+module load mpicopy
+module unload module unload GCCcore
 module load OpenMPI/3.1.1-GCC-7.3.0-2.30
 module load Python/3.6.6-intel-2018b
 
 EADIR=/home/$myusername/pyEA/
-cp ${EADIR}*.py ${TMPDIR}
-cp -r ${EADIR}filter_transmissions ${TMPDIR}
-cp -r ${EADIR}input ${TMPDIR}
-cp -r ${EADIR}inicalc ${TMPDIR}
+mpicopy ${EADIR}*.py ${TMPDIR}
+mpicopy ${EADIR}filter_transmissions ${TMPDIR}
+mpicopy ${EADIR}input ${TMPDIR}
+mpicopy ${EADIR}inicalc ${TMPDIR}
 
 cd ${TMPDIR}
 
