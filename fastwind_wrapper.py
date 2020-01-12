@@ -54,11 +54,9 @@ def read_control_pars(control_source):
     """ Read the control parameters from text file """
 
     keys, vals = np.genfromtxt(control_source, dtype=str, comments='#').T
-
     ctrldct = dict(zip(keys, vals))
 
-    print ctrldct
-
+    return ctrldct
 
 def get_defvals(the_filename, freenames, fixednames):
     """Load the default parameters and their names into arrays
@@ -809,7 +807,7 @@ def init_setup(theoutdir):
     in the subdirectory that is used for the run, and
     return the paths to the created directories.
     """
-    
+
     rundir = theoutdir + 'run/'
     savedir = theoutdir + 'saved/'
     indir = theoutdir + 'input_copy/'
