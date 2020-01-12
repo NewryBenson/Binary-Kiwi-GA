@@ -1,0 +1,19 @@
+nind  		      16                    # number of individuals per generation
+ngen 		      10                    # number of generations
+f_gen1                1                     # factor with which nind is multiplied in first generation
+fitmeasure 	      fitness               # fitness measure used for reproduction 'chi2' or 'fitness'
+modelatom             A10HHeNCOPSi          # fastwind model atom
+fw_timeout            40m                   # maximum runtime of fastwind
+inicalcdir            inicalc/              # relative path to inicalc master 
+clone_fraction        0.00                  # clone fraction
+mut_rate_init         0.05                  # initial mutation rate 
+mut_adjust_type       genvariety            # specify how the mutation rate is modified 'constant', 'carbonneau', 'genvariety' ('doer': not implemented)
+doerr_factor          1.5                   # parameter for Doerr mutation
+mut_rate_min          0.001                 # minimum mutation rate for 'carbonneau' and 'genvariety'
+mut_rate_max          0.25                  # maximum mutation rate for 'carbonneau' and 'genvariety'
+mut_rate_factor       1.5                   # factor of mutation rate change for 'carbonneau' and 'genvariety'
+fit_cuttof_min_carb   0.60                  # minimum fitness cutoff 'carbonneau'
+fit_cuttof_max_carb   0.90                  # maximum fitness cutoff 'carbonneau'
+cuttof_increase_genv  1.0                   # cutoff increase mutation rate 'genvariety'
+cuttof_decrease_genv  3.0                   # cutoff decrease mutation rate 'genvariety'
+be_verbose     	      True                  # specify verbosity
