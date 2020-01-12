@@ -1,0 +1,9 @@
+*.pyc
+*.INDAT
+*.DS_Store
+*.swp
+inicalc/*
+output/*
+input/*
+old/*
+misc/*
