@@ -171,7 +171,7 @@ def stepsize_mutation(baby_genes, paramspace, mutation_rate):
     mutated_genes = []
 
     # Loop through all genes (parameters) of the model
-    for i in xrange(len(paramspace)):
+    for i in range(len(paramspace)):
 
         # A mutation only occurs in a fraction (mutation_rate) of
         # the genes.
@@ -204,7 +204,7 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_steps=3.0):
     mutated_genes = []
 
     # Loop through all genes (parameters) of the model
-    for i in xrange(len(paramspace)):
+    for i in range(len(paramspace)):
 
         # A mutation only occurs in a fraction (mutation_rate) of
         # the genes.
@@ -240,7 +240,7 @@ def uniform_mutation(baby_genes, paramspace, mutation_rate):
 
     mutated_genes = []
     # Loop through all genes (parameters) of the model
-    for i in xrange(len(paramspace)):
+    for i in range(len(paramspace)):
 
         # A mutation only occurs in a fraction (mutation_rate) of
         # the genes.

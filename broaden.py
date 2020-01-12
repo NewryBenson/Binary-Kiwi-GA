@@ -13,6 +13,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # Import needed modules
+import sys
 import argparse
 import numpy as np
 from math import sin, pi
@@ -34,9 +35,9 @@ def main():
     # Read in the spectrum
     try:
         wlc, flux = np.loadtxt(arguments.fileName, unpack=True, skiprows=1)
-    except IOError:
-        print("Input spectrum " + arguments.fileName + " not found!")
-        exit()
+    except IOError as ioe:
+        print(ioe, "Input spectrum " + arguments.fileName + " not found!")
+        sys.exit()
     # Resample the input spectrum to even wavelength bins of <binSize> Angstrom
     newWlc = np.arange(wlc[0]+binSize, wlc[-1]-binSize, binSize)
     flux = np.interp(newWlc, wlc, flux)

@@ -74,7 +74,7 @@ nind_first_gen = ctrl.f_gen1*ctrl.nind
 generation = pop.init_pop(nind_first_gen, param_space, fd["dupl_out"])
 modnames = fw.gen_modnames(gencount, nind_first_gen)
 
-fitnesses = map(eval_fitness, modnames, generation)
+fitnesses = list(map(eval_fitness, modnames, generation))
 
 # If the first generation is larger than the typical generation,
 # The top nind fittest individuals of this generation are selected.
@@ -89,7 +89,7 @@ pop.print_report(gencount, best_fitness, np.median(fitnesses), ctrl.be_verbose)
 
 mutation_rate = ctrl.mut_rate_init # initial mutation rate
 
-for agen in xrange(ctrl.ngen):
+for agen in range(ctrl.ngen):
 
     gencount = gencount + 1
     pop.store_mutation(fd["mutation_out"], mutation_rate, agen)
@@ -117,7 +117,7 @@ for agen in xrange(ctrl.ngen):
         ctrl.clone_fraction, param_space, fd["dupl_out"])
     modnames = fw.gen_modnames(gencount, nind_first_gen)
 
-    fitnesses = map(eval_fitness, modnames, generation)
+    fitnesses = list(map(eval_fitness, modnames, generation))
 
     # The fittest individual of the run always survives.
     generation, fitnesses = pop.reincarnate(generation, fitnesses,

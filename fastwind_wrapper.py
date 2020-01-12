@@ -361,7 +361,7 @@ def read_data(flinelist, fnorm):
 
     data_per_line = []
     wave, norm, error = np.genfromtxt(fnorm).T
-    for i in xrange(len(names)):
+    for i in range(len(names)):
 
         # Per line select data, renormalise
         wv, nm, er = parallelcrop(wave, norm, error, lbound[i], rbound[i])
@@ -599,7 +599,7 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
         rchi2_lines = []
         weight_lines = []
 
-        for i in xrange(len(linefiles)):
+        for i in range(len(linefiles)):
 
             chi2info = calc_chi2_line(resdct, linenames[i], linefiles[i],
                 lenfree)
