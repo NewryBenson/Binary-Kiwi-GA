@@ -43,6 +43,10 @@ fw.copy_input(fd,indir)
 fw.remove_old_output(fd)
 
 # Read control parameters
+# #FIXME: many functions have specific lookups into this
+# dictionary as an input, this can be replaced by calling this
+# dictionary only once, and then within the function looking
+# up the values. 
 cdict = fw.read_control_pars(fd["control_in"])
 
 ''' READ INPUT PARAMETERS AND DATA '''
