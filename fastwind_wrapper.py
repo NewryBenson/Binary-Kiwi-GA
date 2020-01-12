@@ -50,6 +50,16 @@ def read_paramspace(param_source):
 
     return variable_names, variable_vals, fixed_names, fixed_vals
 
+def read_control_pars(control_source):
+    """ Read the control parameters from text file """
+
+    keys, vals = np.genfromtxt(control_source, dtype=str, comments='#').T
+
+    ctrldct = dict(zip(keys, vals))
+
+    print ctrldct
+
+
 def get_defvals(the_filename, freenames, fixednames):
     """Load the default parameters and their names into arrays
     with removal of the parameter values that are specified in
@@ -768,6 +778,7 @@ def make_file_dict(indir, outdir):
     radinfofile = 'radius_info.txt'
     defvalfile = 'defaults_fastwind.txt'
     normspecfile = 'spectrum.norm'
+    ctrlfile = 'control.txt'
 
     # File names of output files
     chi2file = 'chi2.txt'
@@ -783,6 +794,7 @@ def make_file_dict(indir, outdir):
     dct = add_to_dict(dct, "radinfo_in", indir + radinfofile)
     dct = add_to_dict(dct, "defvals_in", indir + defvalfile)
     dct = add_to_dict(dct, "normspec_in", indir + normspecfile)
+    dct = add_to_dict(dct, "control_in", indir + ctrlfile)
 
     dct = add_to_dict(dct, "chi2_out", outdir + chi2file)
     dct = add_to_dict(dct, "dupl_out", outdir + duplfile)
