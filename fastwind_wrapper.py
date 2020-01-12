@@ -298,6 +298,7 @@ def check_parameters():
     - step size: should be always greater than zero if a param is free.
     - check for duplicates in param_space file
     - if fic != -1, then are all clumping values specified outside default?
+    - check whether all lines in line_info are in FORMAL_INPUT.
     """
 
 def read_linelist(theflinelist):
@@ -739,7 +740,7 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
 
     moddir = init_mod_dir(inicalcdir, rundir, mname)
     create_indat(genes, mname, moddir, *all_pars)
-    # out = run_fw(modelatom, moddir, mname, fw_timeout, lineinfo)
+    out = run_fw(modelatom, moddir, mname, fw_timeout, lineinfo)
     out = 1
 
     if out == 0:
@@ -748,9 +749,7 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
         fitinfo = assess_fitness(moddir, mname, lineinfo, dof, fitmeasure)
 
     runinfo = get_runinfo(moddir)
-    print moddir
-    print runinfo
-    # clean_run(moddir, mname, savedir, out)
+    clean_run(moddir, mname, savedir, out)
     store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname)
 
     return fitinfo[0]
