@@ -1,0 +1,6 @@
+# Specify radius or luminosity anchor
+# If fixed radius type:
+# fixed_radius <radius in solar radii>
+# If luminosity anchor type:
+# <bandname> <observed magnitude> <zero point system>
+SPHERE_Ks -5.5 vega
