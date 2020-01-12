@@ -55,6 +55,19 @@ def read_control_pars(control_source):
 
     keys, vals = np.genfromtxt(control_source, dtype=str, comments='#').T
     ctrldct = dict(zip(keys, vals))
+    ctrldct["nind"] = int(ctrldct["nind"])
+    ctrldct["ngen"] = int(ctrldct["ngen"])
+    ctrldct["f_gen1"] = int(ctrldct["f_gen1"])
+    ctrldct["clone_fraction"] = float(ctrldct["clone_fraction"])
+    ctrldct["mut_rate_init"] = float(ctrldct["mut_rate_init"])
+    ctrldct["doerr_factor"] = float(ctrldct["doerr_factor"])
+    ctrldct["mut_rate_min"] = float(ctrldct["mut_rate_min"])
+    ctrldct["mut_rate_max"] = float(ctrldct["mut_rate_max"])
+    ctrldct["mut_rate_factor"] = float(ctrldct["mut_rate_factor"])
+    ctrldct["fit_cutoff_min_carb"] = float(ctrldct["fit_cutoff_min_carb"])
+    ctrldct["fit_cutoff_max_carb"] = float(ctrldct["fit_cutoff_max_carb"])
+    ctrldct["cuttoff_increase_genv"] = float(ctrldct["cuttoff_increase_genv"])
+    ctrldct["cuttoff_decrease_genv"] = float(ctrldct["cuttoff_decrease_genv"])
 
     return ctrldct
 
