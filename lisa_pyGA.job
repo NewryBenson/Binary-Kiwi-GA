@@ -1,0 +1,34 @@
+#!/bin/bash
+#SBATCH --job-name=zeta_persei
+#SBATCH -t 000:04:00
+#SBATCH -N 1
+#SBATCH -n 16
+#SBATCH -p short
+#SBATCH --no-requeue
+
+myusername=brandss
+RUNNAME=zeta_per_test
+
+# In the future this has to be fixed by using MPI-copy!
+# This disk can get full!!
+TMPDIR=/nfs/scratch/$myusername
+if [ ! -d "${TMPDIR}" ]; then mkdir ${TMPDIR} ; fi
+
+module load 2019
+module load pre2019
+#module load mpicopy
+module load OpenMPI/3.1.1-GCC-7.3.0-2.30
+module load Python/3.6.6-intel-2018b
+
+EADIR=/home/$myusername/pyEA/
+cp ${EADIR}*.py ${TMPDIR}
+cp -r ${EADIR}filter_transmissions ${TMPDiR}
+cp -r ${EADIR}input ${TMPDiR}
+cp -r ${EADIR}inicalc ${TMPDiR}
+
+cd ${TMPDIR}
+
+timeout 4320m mpiexec -n 16 python pyEA.py ${RUNNAME}
+
+if [ ! -d "${EADIR}/output/" ]; then mkdir ${EADIR}/output/ ; fi
+cp -r ${TMPDIR}/${RUNNAME} ${EADIR}/output/${RUNNAME}

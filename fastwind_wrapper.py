@@ -809,7 +809,7 @@ def init_setup(theoutdir):
     in the subdirectory that is used for the run, and
     return the paths to the created directories.
     """
-
+    
     rundir = theoutdir + 'run/'
     savedir = theoutdir + 'saved/'
     indir = theoutdir + 'input_copy/'

@@ -35,8 +35,10 @@ fw.check_indir(inputdir)
 
 # Initial setup of directories and file paths
 outputdir = paths.outputdir + args.runname + '/'
-fw.mkdir(outputdir)
 fd = fw.make_file_dict(inputdir, outputdir)
+# #FIXME: this has to be done on all nodes! 
+fw.mkdir(paths.outputdir)
+fw.mkdir(outputdir)
 outdir, rundir, savedir, indir = fw.init_setup(outputdir)
 fw.copy_input(fd,indir)
 fw.remove_old_output(fd)
