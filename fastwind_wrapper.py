@@ -746,7 +746,7 @@ def get_runinfo(moddir):
     return [maxcor, maxit, cputime]
 
 def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
-    fw_timeout, lineinfo, dof, fitmeasure, chi2file, paramnames, mname, genes):
+    fw_timeout, lineinfo, dof, fitmeasure, chi2file, paramnames, name_n_genes):
     """Evaluate the fitness of an individual. This step is
     responsible for the bulk of the computation time. It does the
     following:
@@ -758,6 +758,8 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     - Assess the fitness of the model
     - Save output and clean the run directory.
     """
+
+    mname, genes = name_n_genes
 
     moddir = init_mod_dir(inicalcdir, rundir, mname)
     create_indat(genes, mname, moddir, *all_pars)

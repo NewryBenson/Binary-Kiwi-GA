@@ -88,7 +88,12 @@ if not pool.is_master():
     pool.wait()
     sys.exit(0)
 
-fitnesses = list(pool.map(eval_fitness, modnames, generation))
+names_genes = []
+for mname, gene in zip(modnames, generation):
+    names_genes.append([mname, gene])
+
+# fitnesses = list(pool.map(eval_fitness, modnames, generation))
+fitnesses = list(pool.map(eval_fitness, names_genes))
 
 # If the first generation is larger than the typical generation,
 # The top nind fittest individuals of this generation are selected.
@@ -131,6 +136,13 @@ for agen in range(cdict["ngen"]):
     generation = pop.reproduce(generation, fitnesses, mutation_rate,
         cdict["clone_fraction"], param_space, fd["dupl_out"])
     modnames = fw.gen_modnames(gencount, nind_first_gen)
+
+    names_genes = []
+    for mname, gene in zip(modnames, generation):
+        names_genes.append([mname, gene])
+
+    # fitnesses = list(pool.map(eval_fitness, modnames, generation))
+    fitnesses = list(pool.map(eval_fitness, names_genes))
 
     fitnesses = list(pool.map(eval_fitness, modnames, generation))
 
