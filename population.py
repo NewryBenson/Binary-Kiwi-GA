@@ -346,7 +346,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
 
     be_verbose = False
     if be_verbose:
-        print "DUPLICATE COUNT GEN: ", dupcount
+        print("DUPLICATE COUNT GEN: " + str(dupcount))
 
     return pop_new
 
