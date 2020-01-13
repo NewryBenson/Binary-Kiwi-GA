@@ -298,7 +298,8 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     # Write input file for pformal
     with open(moddir + formal_in, 'w') as f:
         f.write(modname + '\n')
-        if dct['windturb'] > 0.0 and dct['windturb'] < 1.0:
+        windt = float(dct['windturb'])
+        if windt > 0.0 and windt < 1.0:
             turbstring = dct['vturb'] + ' ' + dct['windturb'] + '\n'
         else:
             turbstring = dct['vturb'] + '\n'
