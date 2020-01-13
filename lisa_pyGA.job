@@ -14,14 +14,14 @@ RUNNAME=zeta_per_test
 # TMPDIR=/nfs/scratch/$myusername/pyEA
 # if [ ! -d "${TMPDIR}" ]; then mkdir ${TMPDIR} ; fi
 
+module load 2019
 module load pre2019
 module load mpicopy
-module unload GCCcore binutils zlib ifort
-module load 2019
+module unload GCCcore binutils
 module load OpenMPI/3.1.1-GCC-7.3.0-2.30
 module load Python/3.6.6-intel-2018b
 
-# echo ${TMPDIR}
+echo ${TMPDIR}
 
 EADIR=/home/$myusername/pyEA/
 mpicopy ${EADIR}infinite.sh
@@ -31,10 +31,11 @@ mpicopy ${EADIR}input
 mpicopy ${EADIR}inicalc
 
 cd ${TMPDIR}
-
-timeout 4320m mpiexec -n 32 python pyEA.py ${RUNNAME}
+ls
+pwd
+pyfile=${TMPDIR}pyEA.py
+timeout 4320m mpiexec -n 32 python ${pyfile} ${RUNNAME}
 
 ./infinite.sh
-
 # if [ ! -d "${EADIR}/output/" ]; then mkdir ${EADIR}/output/ ; fi
 # cp -r ${TMPDIR}/${RUNNAME} ${EADIR}/output/${RUNNAME}
