@@ -33,7 +33,7 @@ mpicopy ${EADIR}inicalc
 cd ${TMPDIR}
 ls
 pwd
-pyfile=${TMPDIR}pyEA.py
+pyfile=${TMPDIR}/pyEA.py
 timeout 4320m mpiexec -n 32 python ${pyfile} ${RUNNAME}
 
 ./infinite.sh
