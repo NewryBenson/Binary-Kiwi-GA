@@ -5,7 +5,7 @@ import numpy as np
 import collections
 import argparse
 import functools
-# from schwimmbad import MultiPool
+from schwimmbad import MPIPool
 
 import paths as paths
 import population as pop
@@ -83,7 +83,12 @@ nind_first_gen = cdict["f_gen1"]*cdict["nind"]
 generation = pop.init_pop(nind_first_gen, param_space, fd["dupl_out"])
 modnames = fw.gen_modnames(gencount, nind_first_gen)
 
-fitnesses = list(map(eval_fitness, modnames, generation))
+pool = MPIPool()
+if not pool.is_master()
+    pool.wait()
+    sys.exit(0)
+
+fitnesses = list(pool.map(eval_fitness, modnames, generation))
 
 # If the first generation is larger than the typical generation,
 # The top nind fittest individuals of this generation are selected.
@@ -127,7 +132,7 @@ for agen in range(cdict["ngen"]):
         cdict["clone_fraction"], param_space, fd["dupl_out"])
     modnames = fw.gen_modnames(gencount, nind_first_gen)
 
-    fitnesses = list(map(eval_fitness, modnames, generation))
+    fitnesses = list(pool.map(eval_fitness, modnames, generation))
 
     # The fittest individual of the run always survives.
     generation, fitnesses = pop.reincarnate(generation, fitnesses,
@@ -139,7 +144,7 @@ for agen in range(cdict["ngen"]):
         cdict["be_verbose"])
 
 
-
+pool.close()
 
 
 

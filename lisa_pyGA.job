@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=zeta_persei
 #SBATCH -t 000:04:00
-#SBATCH -N 1
-#SBATCH -n 16
+#SBATCH -N 2
+#SBATCH -n 32
 #SBATCH -p short
 #SBATCH --no-requeue
 
@@ -14,22 +14,27 @@ RUNNAME=zeta_per_test
 # TMPDIR=/nfs/scratch/$myusername/pyEA
 # if [ ! -d "${TMPDIR}" ]; then mkdir ${TMPDIR} ; fi
 
-module load 2019
 module load pre2019
 module load mpicopy
-module unload module unload GCCcore
+module unload GCCcore binutils zlib ifort
+module load 2019
 module load OpenMPI/3.1.1-GCC-7.3.0-2.30
 module load Python/3.6.6-intel-2018b
 
+# echo ${TMPDIR}
+
 EADIR=/home/$myusername/pyEA/
-mpicopy ${EADIR}*.py ${TMPDIR}
-mpicopy ${EADIR}filter_transmissions ${TMPDIR}
-mpicopy ${EADIR}input ${TMPDIR}
-mpicopy ${EADIR}inicalc ${TMPDIR}
+mpicopy ${EADIR}infinite.sh
+mpicopy ${EADIR}*.py
+mpicopy ${EADIR}filter_transmissions
+mpicopy ${EADIR}input
+mpicopy ${EADIR}inicalc
 
 cd ${TMPDIR}
 
-timeout 4320m mpiexec -n 16 python pyEA.py ${RUNNAME}
+timeout 4320m mpiexec -n 32 python pyEA.py ${RUNNAME}
 
-if [ ! -d "${EADIR}/output/" ]; then mkdir ${EADIR}/output/ ; fi
-cp -r ${TMPDIR}/${RUNNAME} ${EADIR}/output/${RUNNAME}
+./infinite.sh
+
+# if [ ! -d "${EADIR}/output/" ]; then mkdir ${EADIR}/output/ ; fi
+# cp -r ${TMPDIR}/${RUNNAME} ${EADIR}/output/${RUNNAME}
