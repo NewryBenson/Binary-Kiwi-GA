@@ -84,7 +84,7 @@ generation = pop.init_pop(nind_first_gen, param_space, fd["dupl_out"])
 modnames = fw.gen_modnames(gencount, nind_first_gen)
 
 pool = MPIPool()
-if not pool.is_master()
+if not pool.is_master():
     pool.wait()
     sys.exit(0)
 
