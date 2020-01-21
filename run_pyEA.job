@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH --job-name=pyEA
+#SBATCH -t 01:00:00
+#SBATCH -n 32
+#SBATCH --no-requeue 
+
+RUNNAME=zeta_per_test
+
+# Load modules
+module load 2019
+module load Python/3.6.6-intel-2018b
+
+# Define paths
+scratch=/scratch-shared/sbrands
+homedir=/home/sbrands/pyEA/
+
+# Create and copy directories and files
+mkdir -p $scratch 
+cp -r ${homedir}*.py $scratch
+cp -r ${homedir}filter_transmissions $scratch
+cp -r ${homedir}input $scratch
+cp -r ${homedir}inicalc $scratch
+
+# Navigate to computation directory and start run
+cd $scratch 
+mpirun -n 32 python3 pyEA.py ${RUNNAME}
