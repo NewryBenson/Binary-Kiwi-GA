@@ -410,7 +410,7 @@ def get_top_x_fittest(population, chi_pop, topx):
     return best_population, best_chi2s
 
 def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
-    mut_rate_min, mut_rate_max, fit_cuttof_min, fit_cuttof_max):
+    mut_rate_min, mut_rate_max, fit_cutoff_min, fit_cutoff_max):
     """Adjust the mutation rate based on the typical fitness
     in a population of individuals, as is suggested in
     Carbonneau."""
@@ -429,9 +429,9 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
 
     ratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
 
-    if ratio <= fit_cuttof_min:
+    if ratio <= fit_cutoff_min:
         new_rate = min(mut_rate_max, old_rate*mut_rate_factor)
-    elif ratio >= fit_cuttof_max:
+    elif ratio >= fit_cutoff_max:
         new_rate = max(mut_rate_min, old_rate/mut_rate_factor)
     else:
         new_rate = old_rate

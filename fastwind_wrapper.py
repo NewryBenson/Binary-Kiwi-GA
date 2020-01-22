@@ -10,7 +10,7 @@ from scipy import interpolate
 def mkdir(path):
     """Create a directory"""
     if not os.path.isdir(path):
-        os.system('mkdir ' + path)
+        os.system('mkdir -p ' + path)
 
 def rmfile(path):
     """Remove a file"""
@@ -476,8 +476,8 @@ def apply_broadening(mname, moddir, linenames, lineres):
     # Look up all FW line output and exit if there is none.
     linefiles = glob.glob(moddir + 'OUT.*')
     if len(linefiles) == 0:
-        os.chdir('..')
-        return
+        #os.chdir('..')
+        return 0
 
     # These likely have a different order than the filenames
     # that are read in from the linefile.
@@ -522,7 +522,7 @@ def apply_broadening(mname, moddir, linenames, lineres):
         broadcommand = do_broaden + input + do_res + do_vrot + do_macro
         os.system(broadcommand)
 
-    return
+    return 1
 
 def run_fw(modatom, moddir, modname, fwtime, lineinfo):
     """Run a fastwind model. This involves executing the files
@@ -537,8 +537,7 @@ def run_fw(modatom, moddir, modname, fwtime, lineinfo):
     # Apply instrumental, rotational and macroturbulent
     # broadening to the fastwind OUT. files.
     try:
-        apply_broadening(modname, moddir, linenames, lineres)
-        return 1
+        return apply_broadening(modname, moddir, linenames, lineres)
     except:
         return 0
 
@@ -611,36 +610,36 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     for lname in linenames:
         linefiles.append(moddir + lname + '.prof.fin')
 
-    try:
-        # Create a dictionary for looking up the data of a line
-        resdct = dict(zip(linenames, linedata))
+    #try:
+    # Create a dictionary for looking up the data of a line
+    resdct = dict(zip(linenames, linedata))
 
-        chi2_tot = 0
-        dof_tot = lenfree
-        chi2_lines = []
-        rchi2_lines = []
-        weight_lines = []
+    chi2_tot = 0
+    dof_tot = lenfree
+    chi2_lines = []
+    rchi2_lines = []
+    weight_lines = []
 
-        for i in range(len(linefiles)):
+    for i in range(len(linefiles)):
 
-            chi2info = calc_chi2_line(resdct, linenames[i], linefiles[i],
-                lenfree)
-            chi2_line, rchi2_line, np_line = chi2info
+        chi2info = calc_chi2_line(resdct, linenames[i], linefiles[i],
+            lenfree)
+        chi2_line, rchi2_line, np_line = chi2info
 
-            chi2_lines.append(chi2_line)
-            rchi2_lines.append(rchi2_line)
-            weight_lines.append(lineweight[i])
+        chi2_lines.append(chi2_line)
+        rchi2_lines.append(rchi2_line)
+        weight_lines.append(lineweight[i])
 
-            chi2_tot = chi2_tot + chi2_line
-            dof_tot = dof_tot + np_line
+        chi2_tot = chi2_tot + chi2_line
+        dof_tot = dof_tot + np_line
 
-        rchi2_tot = chi2_tot / dof_tot
-        fitness = calc_fitness(rchi2_lines, weight_lines)
+    rchi2_tot = chi2_tot / dof_tot
+    fitness = calc_fitness(rchi2_lines, weight_lines)
 
-        fitnesses_lines = 1./np.array(rchi2_lines)
+    fitnesses_lines = 1./np.array(rchi2_lines)
 
-    except:
-        return failed_model(linenames)
+    #except:
+    #    return failed_model(linenames)
 
     ####################### FITNESS MEASURE #######################
     # The reproduction code assumes higher value for the fitness
@@ -733,11 +732,15 @@ def get_runinfo(moddir):
     if os.path.exists(moddir + 'pntle.log'):
         try:
             maxcor = grep_pnlte(moddir, "CORR. MAX:", 'corr_max', -1)
-            maxit = grep_pnlte(moddir, "+  ITERATION NO", 'it_max', -2)
-            cputime = grep_pnlte(moddir, "CPU time", 'cpu', -1)
         except:
             maxcor = '0.0'
+        try:
+            maxit = grep_pnlte(moddir, "+  ITERATION NO", 'it_max', -2)
+        except:
             maxit = '0'
+        try:
+            cputime = grep_pnlte(moddir, "CPU time", 'cpu', -1)
+        except:
             cputime = '99999.9'
     else:
         maxcor = '0.0'
@@ -765,7 +768,6 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     moddir = init_mod_dir(inicalcdir, rundir, mname)
     create_indat(genes, mname, moddir, *all_pars)
     out = run_fw(modelatom, moddir, mname, fw_timeout, lineinfo)
-    out = 1
 
     if out == 0:
         fitinfo = failed_model(lineinfo[0])
@@ -899,11 +901,13 @@ def create_FORMAL_INPUT(inidir, line_subset):
     # transitions can be spread out over several lines.
     formal_new = [':T VSINI\n', '0.\n']
     continueline = False
+    list_formal_lines = []
     for line in lines:
         splitline = line.strip().split()
         if len(splitline) > 2:
             if splitline[0] in line_subset or continueline:
                 if splitline[0] in line_subset:
+                    list_formal_lines.append(splitline[0])
                     nsubslines = int(splitline[1])
                     lenforminput = nsubslines*4 + 2
                     ninputs = len(splitline)
@@ -925,4 +929,14 @@ def create_FORMAL_INPUT(inidir, line_subset):
     # Navigate back to the main directory
     os.chdir('..')
 
-#
+    missing_lines = []
+    for aline in line_subset:
+        if aline not in list_formal_lines:
+            missing_lines.append(aline)
+
+    if missing_lines != []:
+        print('Some diagnostic lines are not found in FORMAL_INPUT_master!')
+        for missing in missing_lines:
+            print(missing + ' not found')
+        print('Exiting pyEA... :-(')
+        sys.exit()

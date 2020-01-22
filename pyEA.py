@@ -24,11 +24,12 @@ import fastwind_wrapper as fw
 
 ''' INITIALIZE / SET UP '''
 # #FIXME with sys there's no help but also no extra package required.
-# #FIXME Setup should be done on all nodes
 
 # Read command line arguments and exit if no input is found.
 parser = argparse.ArgumentParser(description='Run pika2')
 parser.add_argument('runname', help='Specify run name')
+parser.add_argument('-c', action='store_true', help=('Continues
+a run, using fitnessess/parameters of the last generation.'))
 args = parser.parse_args()
 inputdir = paths.inputdir + args.runname + '/'
 fw.check_indir(inputdir)
@@ -36,7 +37,6 @@ fw.check_indir(inputdir)
 # Initial setup of directories and file paths
 outputdir = paths.outputdir + args.runname + '/'
 fd = fw.make_file_dict(inputdir, outputdir)
-# #FIXME: this has to be done on all nodes!
 fw.mkdir(paths.outputdir)
 fw.mkdir(outputdir)
 outdir, rundir, savedir, indir = fw.init_setup(outputdir)
@@ -50,6 +50,9 @@ fw.remove_old_output(fd)
 # up the values.
 cdict = fw.read_control_pars(fd["control_in"])
 
+if not args.c:
+    fw.remove_old_output(fd)
+
 ''' READ INPUT PARAMETERS AND DATA '''
 
 # Read input files and data
@@ -60,6 +63,9 @@ defnames, defvals = fw.get_defvals(fd["defvals_in"], param_names, fixed_names)
 all_pars = [param_names, fixed_pars, fixed_names, defvals, defnames, radinfo]
 dof = len(param_names)
 lineinfo = fw.read_data(fd["linelist_in"], fd["normspec_in"])
+
+if args.c:
+    # read output from the last generation. 
 
 ''' PREPARE FASTWIND '''
 
@@ -92,6 +98,7 @@ names_genes = []
 for mname, gene in zip(modnames, generation):
     names_genes.append([mname, gene])
 
+#FIXME remove line
 # fitnesses = list(pool.map(eval_fitness, modnames, generation))
 fitnesses = list(pool.map(eval_fitness, names_genes))
 
@@ -121,14 +128,14 @@ for agen in range(cdict["ngen"]):
     elif cdict["mut_adjust_type"] == 'carbonneau':
         mutation_rate = pop.adjust_mutation_rate_carbonneau(mutation_rate,
             fitnesses, cdict["mut_rate_factor"], cdict["mut_rate_min"],
-            cdict["mut_rate_max"], cdict["fit_cuttof_min_carb"],
-            cdict["fit_cuttof_min_carb"])
+            cdict["mut_rate_max"], cdict["fit_cutoff_min_carb"],
+            cdict["fit_cutoff_min_carb"])
 
     elif cdict["mut_adjust_type"] == 'genvariety':
         gen_variety = pop.assess_variation(generation, param_space, genbest)
         mean_gen_variety = np.mean(gen_variety)
         mutation_rate = pop.adjust_mutation_genvariety(mutation_rate,
-            cdict["cuttof_decrease_genv"], cdict["cuttof_increase_genv"],
+            cdict["cutoff_decrease_genv"], cdict["cutoff_increase_genv"],
             cdict["mut_rate_factor"], cdict["mut_rate_min"],
             cdict["mut_rate_max"], mean_gen_variety, param_space)
 
@@ -141,10 +148,12 @@ for agen in range(cdict["ngen"]):
     for mname, gene in zip(modnames, generation):
         names_genes.append([mname, gene])
 
+    #FIXME remove line
     # fitnesses = list(pool.map(eval_fitness, modnames, generation))
     fitnesses = list(pool.map(eval_fitness, names_genes))
 
-    fitnesses = list(pool.map(eval_fitness, modnames, generation))
+    #FIXME remove line
+    # fitnesses = list(pool.map(eval_fitness, modnames, generation))
 
     # The fittest individual of the run always survives.
     generation, fitnesses = pop.reincarnate(generation, fitnesses,
