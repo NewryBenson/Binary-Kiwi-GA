@@ -47,7 +47,7 @@ def main():
     # Apply rotational broadening
     flux = rotBroad(wlc, flux, limbDark, arguments.vrot)
     # Apply macroturbulent broadening
-    if arguments.vmacro != -1:
+    if arguments.vmacro not in (-1, None):
         flux = macroBroad(wlc, flux, arguments.vmacro)
     # Resample to <finalBins> Angstrom
     if finalBins != binSize:

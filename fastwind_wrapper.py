@@ -610,36 +610,36 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     for lname in linenames:
         linefiles.append(moddir + lname + '.prof.fin')
 
-    #try:
-    # Create a dictionary for looking up the data of a line
-    resdct = dict(zip(linenames, linedata))
+    try:
+        # Create a dictionary for looking up the data of a line
+        resdct = dict(zip(linenames, linedata))
 
-    chi2_tot = 0
-    dof_tot = lenfree
-    chi2_lines = []
-    rchi2_lines = []
-    weight_lines = []
+        chi2_tot = 0
+        dof_tot = lenfree
+        chi2_lines = []
+        rchi2_lines = []
+        weight_lines = []
 
-    for i in range(len(linefiles)):
+        for i in range(len(linefiles)):
 
-        chi2info = calc_chi2_line(resdct, linenames[i], linefiles[i],
-            lenfree)
-        chi2_line, rchi2_line, np_line = chi2info
+            chi2info = calc_chi2_line(resdct, linenames[i], linefiles[i],
+                lenfree)
+            chi2_line, rchi2_line, np_line = chi2info
 
-        chi2_lines.append(chi2_line)
-        rchi2_lines.append(rchi2_line)
-        weight_lines.append(lineweight[i])
+            chi2_lines.append(chi2_line)
+            rchi2_lines.append(rchi2_line)
+            weight_lines.append(lineweight[i])
 
-        chi2_tot = chi2_tot + chi2_line
-        dof_tot = dof_tot + np_line
+            chi2_tot = chi2_tot + chi2_line
+            dof_tot = dof_tot + np_line
 
-    rchi2_tot = chi2_tot / dof_tot
-    fitness = calc_fitness(rchi2_lines, weight_lines)
+        rchi2_tot = chi2_tot / dof_tot
+        fitness = calc_fitness(rchi2_lines, weight_lines)
 
-    fitnesses_lines = 1./np.array(rchi2_lines)
+        fitnesses_lines = 1./np.array(rchi2_lines)
 
-    #except:
-    #    return failed_model(linenames)
+    except:
+        return failed_model(linenames)
 
     ####################### FITNESS MEASURE #######################
     # The reproduction code assumes higher value for the fitness
@@ -718,6 +718,7 @@ def clean_run(moddir, modname, savedir, outflag):
     os.system(rmdircommand)
 
 def grep_pnlte(moddir, search, outputfile, loc):
+    """Function to search the pnlte-log file"""
     pnltelog = moddir + 'pnlte.log'
     tmp = moddir + outputfile + '.tmp'
     txt = moddir + outputfile + '.txt'
@@ -729,7 +730,13 @@ def grep_pnlte(moddir, search, outputfile, loc):
     return str(value)
 
 def get_runinfo(moddir):
-    if os.path.exists(moddir + 'pntle.log'):
+    """Function that looks up the number of NLTE-iterations that 
+    fastwind has done, the maximum correction of the last iteration,
+    and, if the model has finished, the total CPU time.
+    This is done by using grep on the pnlte.log file. 
+    (this file will later be removed)
+    """
+    if os.path.exists(moddir + 'pnlte.log'):
         try:
             maxcor = grep_pnlte(moddir, "CORR. MAX:", 'corr_max', -1)
         except:
@@ -803,6 +810,13 @@ def make_file_dict(indir, outdir):
     bestchi2file = 'best_chi2.txt'
     paramspacefile_out = 'parameter_space.txt'
 
+    # File names of files for run continuation
+    # These are copies that contain only fully completed generations
+    chi2_contfile = 'chi2_cont.txt'
+    dupl_contfile = 'dupl_cont.txt' 
+    generation_contfile = 'savegen_cont.txt'
+    fitnesses_contfile = 'savefitness_cont.txt'
+
     dct = {}
 
     dct = add_to_dict(dct, "linelist_in", indir + linelistfile)
@@ -817,6 +831,11 @@ def make_file_dict(indir, outdir):
     dct = add_to_dict(dct, "mutation_out", outdir + mutationfile)
     dct = add_to_dict(dct, "bestchi2_out", outdir + bestchi2file)
     dct = add_to_dict(dct, "paramspace_out", outdir + paramspacefile_out)
+
+    dct = add_to_dict(dct, "chi2_cont", outdir + chi2_contfile)
+    dct = add_to_dict(dct, "dupl_cont", outdir + dupl_contfile)
+    dct = add_to_dict(dct, "gen_cont", outdir + generation_contfile)
+    dct = add_to_dict(dct, "fit_cont", outdir + fitnesses_contfile)
 
     return dct
 
@@ -841,20 +860,28 @@ def check_indir(indir):
         print("Exiting")
         sys.exit()
 
-def copy_input(dict, theindir):
+def copy_input(adict, theindir):
     """Copy the input directory to the output directory.
     This is not strictly necessary, but when looking at the
     output it is nice to have the input also at hand.
     """
-    for key in dict:
+    for key in adict:
         if "_in" in key:
-            os.system("cp " + dict[key] + " " + theindir)
+            os.system("cp " + adict[key] + " " + theindir)
 
-def remove_old_output(dict):
-    """Remove old output files that might be present"""
-    for key in dict:
-        if "_out" in key and os.path.isfile(dict[key]):
-            os.system("rm " + dict[key])
+def prepare_output_files(adict, cont_tf):
+    """Move the _cont files to chi2 and duplicate files if the run is 
+    continuing another run, otherwise remove the old output files, 
+    if any are present.
+    """ 
+
+    if cont_tf:
+        os.system("cp " + adict["chi2_cont"] + " " + adict["chi2_out"])
+        os.system("cp " + adict["dupl_cont"] + " " + adict["dupl_out"])
+    else:
+        for key in adict:
+            if "_out" in key and os.path.isfile(adict[key]):
+                os.system("rm " + adict[key])
 
 def init_mod_dir(inidir, therundir, modname):
     """Copy the inicalc directory to a directory for a specific
@@ -882,6 +909,9 @@ def create_FORMAL_INPUT(inidir, line_subset):
     will be fitted. Based on the linelist we go through the
     FORMAL_INPUT "master" file and only copy those that we need to
     the FORMAL_INPUT that we will use.
+    Furthermore, the function checks whether all lines that are in 
+    the line_subset (the diagnositc lines) are present in the 
+    FORMAL_INPUT_master file, if not, it exits the run. 
     """
 
     # Navigate to the main inicalc directory, the one that will
@@ -940,3 +970,13 @@ def create_FORMAL_INPUT(inidir, line_subset):
             print(missing + ' not found')
         print('Exiting pyEA... :-(')
         sys.exit()
+
+def read_mut_gen(mut_gen_file):
+    """ Function for restarting the run. Reads mutation rate and
+    generation number of last generation
+    """
+    mutgenlines = np.genfromtxt(mut_gen_file)
+    for mutgen in mutgenlines:
+        gen = int(mutgen[0])
+        mutrate = mutgen[1]
+    return gen, mutrate
