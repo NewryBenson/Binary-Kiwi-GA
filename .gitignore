@@ -8,3 +8,4 @@ input/*
 old/*
 misc/*
 slurm-*out
+*.jpg
