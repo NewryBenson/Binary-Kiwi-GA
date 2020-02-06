@@ -63,11 +63,11 @@ datapath = '/Users/sarah/pyEA/'
 full_short_manual = 'manual'
 
 # If full_short_manual is set to 'manual'
-make_run_summary = False
-make_fitnessdistribution_plot = False
+make_run_summary = True
+make_fitnessdistribution_plot = True
 make_fitnessdistribution_per_line_plot = False
-make_chi2pgen_plot = False
-make_lineprofiles_plot = False # Will take a long time depending on how many models are included.
+make_chi2pgen_plot = True
+make_lineprofiles_plot = True # Will take a long time depending on how many models are included.
 make_correlation_plot = True # will always be done when make_correlation_per_line_plot = True
 make_correlation_per_line_plot = False # This takes a lot of time
 make_param_dist_plot = True
@@ -216,6 +216,7 @@ inputcopydir = datapath + 'input_copy/'
 savedmoddir = datapath + 'saved/'
 
 thechi2file = datapath + 'chi2.txt'
+thebestchi2file = datapath + 'best_chi2.txt'
 themutgenfile = datapath + 'mutation_by_gen.txt'
 thecontrolfile = inputcopydir + 'control.txt'
 thelinefile = inputcopydir + 'line_list.txt'
@@ -248,7 +249,11 @@ outcontrol = np.genfromtxt(thecontrolfile,dtype='str').T
 control_dct = dict(zip(outcontrol[0], outcontrol[1]))
 
 maxindid = float(control_dct["nind"])
-maxgen = np.max(x['gen'].values)
+# maxgen = np.max(x['gen'].values)
+maxgen = np.max(np.genfromtxt(thebestchi2file)[:,0])
+
+# If a generation was not completed, drop those models. 
+x = x.drop(x[x.gen > maxgen].index)
 
 maxgenid = str(int(maxgen)).zfill(4)
 print('Last generation: ' + str(maxgenid))
@@ -264,6 +269,7 @@ lowest_chi2_per_gen = []
 for a_gen_id in unique_genid:
     x_1gen = x[x['run_id'].str.contains(a_gen_id + '_')]
     chi2val = x_1gen['chi2'].values
+    # if len(chi2val) == maxind
     chi2val = chi2val[chi2val <= 1e6]
     median_chi2_per_gen.append(np.median(chi2val))
     mean_chi2_per_gen.append(np.mean(chi2val))
@@ -433,7 +439,7 @@ if make_run_summary or full_short_manual in ('short', 'full'):
     ax[1].set_yticks([])
 
     plt.savefig(plotpath + name_runsummary)
-    print 'Saved', plotpath + name_runsummary
+    # print 'Saved', plotpath + name_runsummary
     plt.close()
 
 
