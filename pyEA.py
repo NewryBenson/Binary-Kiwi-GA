@@ -156,7 +156,7 @@ for agen in range(cdict["ngen"]):
     generation, fitnesses = pop.reincarnate(generation, fitnesses,
         genbest, best_fitness)
     genbest, best_fitness = pop.get_fittest(generation, fitnesses)
-    pop.store_lowestchi2(fd["bestchi2_out"], best_fitness, agen)
+    pop.store_lowestchi2(fd["bestchi2_out"], best_fitness, gencount)
 
     pop.print_report(gencount, best_fitness, np.median(fitnesses),
         cdict["be_verbose"])

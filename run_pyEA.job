@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=pyEA
-#SBATCH -t 01:00:00
-#SBATCH -n 32
+#SBATCH --job-name=sim_H50_SNR100_carbonneau
+#SBATCH -t 50:00:00
+#SBATCH -n 96
 #SBATCH --no-requeue 
 
-RUNNAME=zeta_per_test
+RUNNAME=sim_H50_SNR100_carbonneau
 
 # Load modules
 module load 2019
@@ -23,4 +23,4 @@ cp -r ${homedir}inicalc $scratch
 
 # Navigate to computation directory and start run
 cd $scratch 
-mpirun -n 32 python3 pyEA.py ${RUNNAME}
+mpirun -n 96 python3 pyEA.py ${RUNNAME}

@@ -668,7 +668,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname):
     write_lines = []
 
     if not os.path.isfile(txtfile):
-        headerstring = '#run_id gen chi2 rchi2 fitness maxit maxcorr cputime'
+        headerstring = '#run_id gen chi2 rchi2 fitness maxit maxcorr cputime '
         for pname in paramnames:
             headerstring = headerstring + pname + ' '
         for linenm in linenames:
