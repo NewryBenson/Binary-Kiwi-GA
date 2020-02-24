@@ -9,11 +9,11 @@ import time
 # Functions that control the parameters of the population
 ######################################################################
 
-def gauss(x,a,x0,sigma):
+def gauss(x,baseline,height,center,sigma):
     """
     Gaussian with continuum at 0.
     """
-    y = a * np.exp(-(x-x0)**2 / (2*sigma**2))
+    y = baseline + height * np.exp(-(x-center)**2 / (2*sigma**2))
     return y
 
 
@@ -38,6 +38,15 @@ def store_models(duplfile, individual):
         for aline in write_lines:
             the_file.write(aline)
 
+def carbonneau_ratio(the_fitn):
+    """ Measure for the fitness spread of the population"""
+    best_mod = np.min(the_fitn)
+    median_mod = np.median(the_fitn)
+    
+    carbratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
+
+    return best_mod, median_mod, carbratio
+
 def store_lowestchi2(txtfile, lowestchi2, gcount):
     """ Write the paramters and fitness of each individual in the
     population into a textfile.
@@ -58,8 +67,8 @@ def store_lowestchi2(txtfile, lowestchi2, gcount):
             the_file.write(aline)
 
 def store_mutation(txtfile, mutrate, gcount):
-    """ Write the paramters and fitness of each individual in the
-    population into a textfile.
+    """ Write the mutation rate of the current generation into a 
+    textfile.
     """
     write_lines = []
 
@@ -71,6 +80,28 @@ def store_mutation(txtfile, mutrate, gcount):
 
     mutline = str(gcount) + ' ' + str(mutrate) + '\n'
     write_lines.append(mutline)
+
+    with open(txtfile, 'a') as the_file:
+        for aline in write_lines:
+            the_file.write(aline)
+
+def store_genvar(txtfile, gcount, genvar, fitnesses):
+    """ Write the genetic variety and carbonneau ratio of the current 
+    genertaion into a textfile.
+    """
+    write_lines = []
+
+    if not os.path.isfile(txtfile):
+        headerstring = ('#Generation median_genvariety carbonneau_ratio '
+                        'median_fitness best_fitness \n')
+        write_lines.append(headerstring)
+
+    cbest, cmed, cratio = carbonneau_ratio(fitnesses) 
+    carbstring = str(cratio) + ' ' + str(cmed) + ' ' + str(cbest)
+
+    med_genvar = str(np.median(genvar))
+    genvarline = str(gcount) + ' ' + med_genvar + ' ' + carbstring + '\n'
+    write_lines.append(genvarline)
 
     with open(txtfile, 'a') as the_file:
         for aline in write_lines:
@@ -197,7 +228,8 @@ def stepsize_mutation(baby_genes, paramspace, mutation_rate):
 
     return mutated_genes
 
-def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_steps=3.0):
+def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_frac,
+        gbase):
     """ Mutation by x step sizes, where the chance is weighted
     by 1./x, so that larger changes are less likely. """
 
@@ -217,16 +249,21 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_steps=3.0):
             nsteps = (the_p_max-the_p_min)/the_p_step+1
             param_space = np.linspace(the_p_min, the_p_max, nsteps)
             param_space = param_space[param_space != baby_genes[i]]
-            gauss_width = the_p_step*gwidth_steps
-            props = gauss(param_space, 1, baby_genes[i], gauss_width)
+            gauss_width = (the_p_max-the_p_min)*gwidth_frac
+            props = gauss(param_space, gbase, 1., baby_genes[i], gauss_width)
             props = props / np.sum(props)
 
             mutated_gene = np.random.choice(param_space, 1, p=props)[0]
             mutated_gene = round(mutated_gene, the_p_rounding)
 
+            # This is a check, but actually the code should never
+            # go here and always append the mutated genes?!
+            # I added a print statement to track whether this happens,
+            # if not then this part can be removed.  #FIXME
             if not (mutated_gene < the_p_min or mutated_gene > the_p_max):
                 mutated_genes.append(mutated_gene)
             else:
+                print('ERROR IN gaussian_mutataion: outside range')
                 mutated_genes.append(baby_genes[i])
         else:
             mutated_genes.append(baby_genes[i])
@@ -259,7 +296,8 @@ def uniform_mutation(baby_genes, paramspace, mutation_rate):
     return mutated_genes
 
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
-    dupfile):
+    dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, mut_rate_na,
+    n_ind):
     """Given a population of individuals and a measure for their
     fitness, generate a new generation of individuals.
 
@@ -287,7 +325,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     pop_new = []
 
     dupcount = 0
-    while len(pop_new) < pop_len:
+    while len(pop_new) < n_ind:
 
         # Pick two random parents and look up their genes
         mother_idx = np.random.choice(pop_len, 1, p=repro_prop)[0]
@@ -307,22 +345,37 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         # mutate if it is affected by both these thus equal to
         # (1-mutation_rate)^(2*number of genes).
 
-        # #FIXME 'uniform_factor' should be a variable in control
         # 'uniform_factor' is the factor with which the mutation rate
         # is lowered for so called uniform mutation. This kind of
         # mutation is quite agressive therefore you don't want it
         # to happen to often. (maybe not at all?)
-        uniform_factor = 0.3
-        mutation_rate_u = mutation_rate * uniform_factor
+        #mutation_rate_u = mutation_rate * uniform_factor
 
-        baby_genes1 = uniform_mutation(baby_genes1, paramspace, mutation_rate_u)
-        baby_genes2 = uniform_mutation(baby_genes2, paramspace, mutation_rate_u)
+        #baby_genes1 = uniform_mutation(baby_genes1, paramspace, mutation_rate_u)
+        #baby_genes2 = uniform_mutation(baby_genes2, paramspace, mutation_rate_u)
 
-        baby_genes1 = stepsize_mutation(baby_genes1, paramspace, mutation_rate)
-        baby_genes2 = stepsize_mutation(baby_genes2, paramspace, mutation_rate)
+        #baby_genes1 = stepsize_mutation(baby_genes1, paramspace, mutation_rate)
+        #baby_genes2 = stepsize_mutation(baby_genes2, paramspace, mutation_rate)
 
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, mutation_rate)
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, mutation_rate)
+        gauss_w_na = float(gauss_w_na)
+        gauss_w_br = float(gauss_w_br)
+        gauss_b_na = float(gauss_b_na)
+        gauss_b_br = float(gauss_b_br)
+        mut_rate_na = float(mut_rate_na)
+
+        # Narrow mutation: close to original value, high mutation
+        # rate that is in principle fixed 
+        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, mut_rate_na,
+            gauss_w_na, gauss_b_na)
+        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, mut_rate_na,
+            gauss_w_na, gauss_b_na)
+        
+        # Broad mutation: further away from original value, lower 
+        # mutation rate that is variable
+        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, mutation_rate, 
+            gauss_w_br, gauss_b_br)
+        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, mutation_rate, 
+            gauss_w_br, gauss_b_br)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
         if not dup_tf:
@@ -415,9 +468,6 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
     in a population of individuals, as is suggested in
     Carbonneau."""
 
-    best_mod = np.min(chi2)
-    median_mod = np.median(chi2)
-
     # A large ratio means that the difference between the 'typical
     # model' in a generation, and the fittest model is large. In this
     # case the mutation rate is decreased, so that the genome of the
@@ -427,7 +477,7 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
     # mutation rate is then increased so that less well explored parts
     # of the parameter space will be probed.
 
-    ratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
+    cbest, cmod, ratio = carbonneau_ratio(chi2) 
 
     if ratio <= fit_cutoff_min:
         new_rate = min(mut_rate_max, old_rate*mut_rate_factor)
