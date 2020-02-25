@@ -9,3 +9,4 @@ old/*
 misc/*
 slurm-*out
 *.jpg
+*.job

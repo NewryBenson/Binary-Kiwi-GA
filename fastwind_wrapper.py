@@ -52,13 +52,24 @@ def read_paramspace(param_source):
 
 def read_control_pars(control_source):
     """ Read the control parameters from text file """
-
+    
+    # Read values from file and put into dictionary
     keys, vals = np.genfromtxt(control_source, dtype=str, comments='#').T
     ctrldct = dict(zip(keys, vals))
+    
+    # Convert the numeric files to integers or floats
     ctrldct["nind"] = int(ctrldct["nind"])
     ctrldct["ngen"] = int(ctrldct["ngen"])
-    ctrldct["f_gen1"] = int(ctrldct["f_gen1"])
+    ctrldct["f_gen1"] = float(ctrldct["f_gen1"])
+    ctrldct["ratio_po"] = float(ctrldct["ratio_po"])
+    ctrldct["f_parent"] = float(ctrldct["f_parent"])
+    ctrldct["p_value"] = float(ctrldct["p_value"])
     ctrldct["clone_fraction"] = float(ctrldct["clone_fraction"])
+    ctrldct["w_gauss_br"] = float(ctrldct["w_gauss_br"])
+    ctrldct["w_gauss_na"] = float(ctrldct["w_gauss_na"])
+    ctrldct["b_gauss_br"] = float(ctrldct["b_gauss_br"])
+    ctrldct["b_gauss_na"] = float(ctrldct["b_gauss_na"])
+    ctrldct["mut_rate_na"] = float(ctrldct["mut_rate_na"])
     ctrldct["mut_rate_init"] = float(ctrldct["mut_rate_init"])
     ctrldct["doerr_factor"] = float(ctrldct["doerr_factor"])
     ctrldct["mut_rate_min"] = float(ctrldct["mut_rate_min"])
@@ -68,7 +79,12 @@ def read_control_pars(control_source):
     ctrldct["fit_cutoff_max_carb"] = float(ctrldct["fit_cutoff_max_carb"])
     ctrldct["cutoff_increase_genv"] = float(ctrldct["cutoff_increase_genv"])
     ctrldct["cutoff_decrease_genv"] = float(ctrldct["cutoff_decrease_genv"])
-
+    
+    n_parent = ctrldct["nind"] * ctrldct["ratio_po"]
+    ctrldct["n_keep_parent"] = math.ceil(n_parent * ctrldct["f_parent"])
+    f_keep_offspring = ctrldct["f_parent"] * ctrldct["ratio_po"]
+    ctrldct["n_keep_offspring"] = n_parent - ctrldct["n_keep_parent"]
+    
     return ctrldct
 
 def get_defvals(the_filename, freenames, fixednames):
@@ -321,6 +337,8 @@ def check_parameters():
     - check for duplicates in param_space file
     - if fic != -1, then are all clumping values specified outside default?
     - check whether all lines in line_info are in FORMAL_INPUT.
+    - check that the reinsertion scheme is ok 
+    - check whether the narrow_step_size width is ok
     """
 
 def read_linelist(theflinelist):
@@ -560,6 +578,21 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     """
     wave_data, flux_data, error_data = resdct[nme]
     wave_mod, flux_mod_orig = np.genfromtxt(linefile).T
+    
+    # If the wavelength range of the model is smaller than the data,
+    # then crop the data so that interpolation of the model can 
+    # be done without problems. 
+    if not min(wave_data) > min(wave_mod) and max(wave_data) < max(wave_mod):
+        wave_data_c = wave_data[(wave_data > np.min(wave_mod)) & 
+            (wave_data < np.max(wave_mod))]
+        flux_data_c = flux_data[(wave_data > np.min(wave_mod)) & 
+            (wave_data < np.max(wave_mod))]
+        error_data_c = error_data[(wave_data > np.min(wave_mod)) &
+            (wave_data < np.max(wave_mod))]
+        wave_data = wave_data_c
+        flux_data = flux_data_c 
+        error_data = error_data_c
+        
     flux_mod = interp_modflux(wave_data, wave_mod, flux_mod_orig)
 
     chi2_line = np.sum(((flux_data - flux_mod) / (error_data))**2)
@@ -590,10 +623,12 @@ def failed_model(linenames):
     """Returns the fitness values of a crashed model"""
     chi2_tot = 999999999
     rchi2_tot = 999999999
+    dof_tot = -1
     fitness = 0.0
     fitnesses_lines = np.zeros(len(linenames))
     fitm = 999999999
-    return fitm, fitness, chi2_tot, rchi2_tot, linenames, fitnesses_lines
+    return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot, 
+        linenames, fitnesses_lines)
 
 def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     """Given the fastwind output of a model (broadened), assess
@@ -615,7 +650,7 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
         resdct = dict(zip(linenames, linedata))
 
         chi2_tot = 0
-        dof_tot = lenfree
+        dof_tot = 0
         chi2_lines = []
         rchi2_lines = []
         weight_lines = []
@@ -633,6 +668,7 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
             chi2_tot = chi2_tot + chi2_line
             dof_tot = dof_tot + np_line
 
+        dof_tot = dof_tot - lenfree
         rchi2_tot = chi2_tot / dof_tot
         fitness = calc_fitness(rchi2_lines, weight_lines)
 
@@ -656,28 +692,31 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
         else:
             fitm = 999999999
 
-    return fitm, fitness, chi2_tot, rchi2_tot, linenames, fitnesses_lines
+    return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot,
+        linenames, fitnesses_lines)
 
 def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname):
     """ Write the paramters and fitness of an individual to the
     chi2-textfile.
     """
 
-    fitmeasure, fitness, chi2_tot, rchi2_tot, linenames, linefitns = fitinfo
+    (fitmeasure, fitness, chi2_tot, rchi2_tot, dof_tot, 
+        linenames, linefitns) = fitinfo
 
     write_lines = []
 
     if not os.path.isfile(txtfile):
-        headerstring = '#run_id gen chi2 rchi2 fitness maxit maxcorr cputime '
+        hstring = '#run_id gen chi2 rchi2 dof fitness maxit maxcorr cputime '
         for pname in paramnames:
-            headerstring = headerstring + pname + ' '
+            hstring = hstring + pname + ' '
         for linenm in linenames:
-            headerstring = headerstring + linenm + ' '
-        headerstring = headerstring + '\n'
-        write_lines.append(headerstring)
+            hstring = hstring + linenm + ' '
+        hstring = hstring + '\n'
+        write_lines.append(hstring)
 
     gen = modname.split('_')[0]
-    fitstr = str(chi2_tot) + ' ' + str(rchi2_tot) + ' ' +  str(fitness) + ' '
+    fitstr = (str(chi2_tot) + ' ' + str(rchi2_tot) + ' ' +  str(dof_tot) + 
+        ' ' + str(fitness) + ' ')
     metastr = runinfo[0] + ' ' + runinfo[1] + ' ' + runinfo[2] + ' '
     istr = modname + ' ' + gen + ' ' + fitstr + metastr
     for param in genes:
@@ -809,7 +848,8 @@ def make_file_dict(indir, outdir):
     mutationfile = 'mutation_by_gen.txt'
     bestchi2file = 'best_chi2.txt'
     paramspacefile_out = 'parameter_space.txt'
-
+    genvarfile_out = 'genetic_variety.txt'
+    
     # File names of files for run continuation
     # These are copies that contain only fully completed generations
     chi2_contfile = 'chi2_cont.txt'
@@ -831,6 +871,7 @@ def make_file_dict(indir, outdir):
     dct = add_to_dict(dct, "mutation_out", outdir + mutationfile)
     dct = add_to_dict(dct, "bestchi2_out", outdir + bestchi2file)
     dct = add_to_dict(dct, "paramspace_out", outdir + paramspacefile_out)
+    dct = add_to_dict(dct, "genvar_out", outdir + genvarfile_out)
 
     dct = add_to_dict(dct, "chi2_cont", outdir + chi2_contfile)
     dct = add_to_dict(dct, "dupl_cont", outdir + dupl_contfile)

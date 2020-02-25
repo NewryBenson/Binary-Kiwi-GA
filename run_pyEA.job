@@ -1,18 +1,24 @@
 #!/bin/bash
-#SBATCH --job-name=sim_H50_SNR100_carbonneau
-#SBATCH -t 50:00:00
-#SBATCH -n 96
+#SBATCH --job-name=hst_H50_3
+#SBATCH -t 03:00:00
+#SBATCH -n 24
 #SBATCH --no-requeue 
 
-RUNNAME=sim_H50_SNR100_carbonneau
+runname=hst_H50_3
+do_restart=yes
+ncpu=24
 
 # Load modules
 module load 2019
 module load Python/3.6.6-intel-2018b
 
 # Define paths
-scratch=/scratch-shared/sbrands
+scratch=/scratch-shared/sbrands/${runname}/
 homedir=/home/sbrands/pyEA/
+
+echo Copying files
+echo scratch $scratch 
+echo homedir $homedir
 
 # Create and copy directories and files
 mkdir -p $scratch 
@@ -21,6 +27,28 @@ cp -r ${homedir}filter_transmissions $scratch
 cp -r ${homedir}input $scratch
 cp -r ${homedir}inicalc $scratch
 
-# Navigate to computation directory and start run
+# Navigate to computation directory 
 cd $scratch 
-mpirun -n 96 python3 pyEA.py ${RUNNAME}
+
+echo Now in:
+pwd 
+In this folder:
+ls -l 
+echo Do restart? $do_restart
+
+echo Start run!
+datetime 
+
+# Start run
+if [ "$do_restart" == "yes" ] 
+then
+    echo ...restarting run
+    mpirun -n $ncpu python3 pyEA.py ${runname} -c
+else
+    echo ... creating output dir
+    mkdir -p output
+    echo ... starting run 
+    mpirun -n $ncpu python3 pyEA.py ${runname}
+fi
+
+echo ... Run ENDED! 
