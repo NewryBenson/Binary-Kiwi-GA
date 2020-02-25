@@ -5,7 +5,7 @@
 #SBATCH --no-requeue 
 
 runname=hst_H50_3
-do_restart=no
+do_restart=yes
 ncpu=24
 
 # Load modules

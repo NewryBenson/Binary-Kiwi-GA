@@ -174,11 +174,7 @@ for agen in range(cdict["ngen"]):
     names_genes = []
     for mname, gene in zip(modnames, generation_o):
         names_genes.append([mname, gene])
-    os.system("echo start fitness evaluation " + str(gencount))
-    os.system("date")
     fitnesses_o = list(pool.map(eval_fitness, names_genes))
-    os.system("echo end fitness evaluation " + str(gencount))
-    os.system("date") 
 
     # The parent population (generation, fitnesses), is created 
     # based on the offpsring pop. (generation_o, fitnesses_o)

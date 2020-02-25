@@ -385,7 +385,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
             # In addition to the while statement:
             # Loops breaks half way if the pop len is already
             # reached after one out of two individuals is appended.
-            if len(pop_new) == pop_len:
+            if len(pop_new) == n_ind:
                 break
         else:
             dupcount = dupcount + 1
