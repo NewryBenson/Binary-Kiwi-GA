@@ -27,6 +27,7 @@ import seaborn as sns
 import img2pdf # for saving the scatter plots (fitness vs parameter) in
                       # PNG and then transforming them to pdf (otherwise they load
                       # ridiculously slow)
+import cmocean
 
 ''' ----------------------------------------------------------------------'''
 ''' ----------------------------------------------------------------------'''
@@ -67,7 +68,7 @@ make_run_summary = True
 make_fitnessdistribution_plot = True
 make_fitnessdistribution_per_line_plot = False
 make_chi2pgen_plot = True
-make_lineprofiles_plot = True # Will take a long time depending on how many models are included.
+make_lineprofiles_plot = False # Will take a long time depending on how many models are included.
 make_correlation_plot = True # will always be done when make_correlation_per_line_plot = True
 make_correlation_per_line_plot = False # This takes a lot of time
 make_param_dist_plot = True
@@ -153,8 +154,8 @@ name_correlation_per_line_plot = "7_correlation_perline_GAreport.pdf"
 name_param_dist_zoom_plot = "8_param_dist_zoom_GAreport.pdf"
 
 
-def calculateP(params, lc, chi2, normalize = False):
-    degreesFreedom = len(lc) - len(params)
+def calculateP(params, nnormspec, chi2, normalize):
+    degreesFreedom = nnormspec - len(params)
     if normalize:
         scaling = np.min(chi2)
     else: scaling = 1
@@ -165,7 +166,7 @@ def calculateP(params, lc, chi2, normalize = False):
     return probs
 
 def parallelcrop(list1, list2, start_list1, stop_list1,
-    list3='', list4=''):
+    list3=[], list4=[]):
 
     list1 = np.array(list1)
     list2 = np.array(list2)
@@ -176,9 +177,9 @@ def parallelcrop(list1, list2, start_list1, stop_list1,
     newlist1 = list1[minarg:maxarg]
     newlist2 = list2[minarg:maxarg]
 
-    if list3 != '':
+    if list3 != []:
         newlist3 = list3[minarg:maxarg]
-        if list4 != '':
+        if list4 != []:
             newlist4 = list4[minarg:maxarg]
             return newlist1, newlist2, newlist3, newlist4
         else:
@@ -187,8 +188,12 @@ def parallelcrop(list1, list2, start_list1, stop_list1,
     return newlist1, newlist2
 
 def cm_rgba(x):
+    # IF YOU CHANGE THIS, MAKE SURE TO CHANGE ALSO THE LEGEND
     setcmap = cm.jet
     setnorm = colors.Normalize(0.0, 1.0)
+
+    # setcmap = cm.viridis_r
+    # setnorm = colors.Normalize(-0.1, 1.0)
     setscalarMap = cm.ScalarMappable(norm=setnorm, cmap=setcmap)
     return setscalarMap.to_rgba(x)
 
@@ -252,7 +257,7 @@ maxindid = float(control_dct["nind"])
 # maxgen = np.max(x['gen'].values)
 maxgen = np.max(np.genfromtxt(thebestchi2file)[:,0])
 
-# If a generation was not completed, drop those models. 
+# If a generation was not completed, drop those models.
 x = x.drop(x[x.gen > maxgen].index)
 
 maxgenid = str(int(maxgen)).zfill(4)
@@ -282,36 +287,6 @@ if len(mutationpergen) != len(median_chi2_per_gen):
     mutationpergen = mutationpergen[:-difflen]
 generation, mutation = mutationpergen.T
 
-''' Normfile read in, parameter file read in, P value calculation'''
-normspectrum = np.loadtxt(thespectrumfile)
-
-params = []
-with open(theparamfile) as f:
-    content = f.readlines()
-# Only use in the parameters that have been varied
-for aline in content:
-    if aline.split()[0] in x.columns:
-        params.append(aline.split())
-
-min_redchi2_value = min(x['chi2'])
-print('Min chi2: ' + str(min_redchi2_value))
-
-probabilities = calculateP(params, normspectrum, x['chi2'], True)
-x = x.assign(P=probabilities)
-
-params_dic = OrderedDict()
-params_error = OrderedDict()
-
-min_p = 0.05
-best = pd.Series.idxmax(x['P'])
-ind = x['P'] > min_p
-
-for i in params:
-    params_dic[i[0]] = [float(i[1]), float(i[2])]
-    params_error[i[0]] = [min(x[i[0]][ind]), max(x[i[0]][ind]), x[i[0]][best]]
-
-param_keys = params_dic.keys()
-
 ''' Get linelist '''
 
 linenames = np.genfromtxt(thelinefile, dtype='str').T[0]
@@ -329,6 +304,44 @@ numlines = len(linenames)
 
 print('Reading line file: ')
 print('Number of diagnostic lines: ' + str(numlines))
+
+''' Normfile read in, parameter file read in, P value calculation'''
+normspectrum = np.loadtxt(thespectrumfile)
+
+params = []
+with open(theparamfile) as f:
+    content = f.readlines()
+# Only use in the parameters that have been varied
+for aline in content:
+    if aline.split()[0] in x.columns:
+        params.append(aline.split())
+
+min_redchi2_value = min(x['chi2'])
+print('Min chi2: ' + str(min_redchi2_value))
+
+normspec_wave, normspec_flux, normspec_err = normspectrum.T
+
+specpoints = 0
+for i in range(len(line_norm_starts)):
+    npoints_line = len(parallelcrop(normspec_wave, normspec_flux,
+        line_norm_starts[i], line_norm_stops[i], normspec_err)[0])
+    specpoints = specpoints + npoints_line
+
+probabilities = calculateP(params, specpoints, x['chi2'], True)
+x = x.assign(P=probabilities)
+
+params_dic = OrderedDict()
+params_error = OrderedDict()
+
+min_p = 0.05
+best = pd.Series.idxmax(x['P'])
+ind = x['P'] > min_p
+
+for i in params:
+    params_dic[i[0]] = [float(i[1]), float(i[2])]
+    params_error[i[0]] = [min(x[i[0]][ind]), max(x[i[0]][ind]), x[i[0]][best]]
+
+param_keys = params_dic.keys()
 
 ''' Loading extra spectra '''
 
@@ -396,8 +409,8 @@ if make_run_summary or full_short_manual in ('short', 'full'):
     for lp in range(len(param_keys)):
         strpname = param_keys[lp]
         strbestp = str(round(params_error[param_keys[lp]][2],numround))
-        strdiffmin = str(round(params_error[param_keys[lp]][2] - params_error[param_keys[lp]][0],numround))
-        strdiffplus =  str(round(params_error[param_keys[lp]][1] - params_error[param_keys[lp]][2],numround))
+        strdiffplus = str(round(params_error[param_keys[lp]][2] - params_error[param_keys[lp]][0],numround))
+        strdiffmin =  str(round(params_error[param_keys[lp]][1] - params_error[param_keys[lp]][2],numround))
         strrange = ('[' + str(params_error[param_keys[lp]][0]) + ', '
             +  str(params_error[param_keys[lp]][1]) + ']')
 
@@ -411,10 +424,16 @@ if make_run_summary or full_short_manual in ('short', 'full'):
         ax[0].text(0.40, (1.-pls-lp*ew*pls)-hpls, strdiffplus, transform=ax[0].transAxes, fontsize=fz_err, va='top')
         ax[0].text(0.60, 1.-pls-lp*ew*pls, strrange, transform=ax[0].transAxes, fontsize=fz_err, va='top')
 
+    maxlenrunname = 15
+    if len(runname) > maxlenrunname:
+        printrunname = runname[:maxlenrunname] + '\n' + runname[maxlenrunname:]
+    else:
+        printrunname = runname
+
     run_info_labels = []
     run_info_data = []
     run_info_labels.append('Run name')
-    run_info_data.append(runname)
+    run_info_data.append(printrunname)
     run_info_labels.append('# Generations')
     run_info_data.append(str(int(max(x['gen_id']))))
     run_info_labels.append('# Population size')
@@ -484,7 +503,7 @@ if (make_param_dist_plot or make_param_dist_plot_detail or
                 paramcount = paramcount + 1
                 if paramcount <= nparams:
                     sns.violinplot( x=x['gen_id'], y=x[param_keys[v_param_pp*npage+i]],
-                    linewidth=0.1, scale='width', ax=ax[i])
+                    linewidth=0.1, scale='width', ax=ax[i], cut=0)
                 else:
                     ax[i].axis('off')
 
@@ -540,7 +559,7 @@ if (make_param_dist_plot or make_param_dist_plot_detail or
                     paramcount = paramcount + 1
                     if paramcount <= nparams:
                         sns.violinplot( x=x_subpage['gen_id'], y=x_subpage[param_keys[v_param_pp*npage+i]],
-                        linewidth=0.1, scale='width', ax=ax[i])
+                        linewidth=0.1, scale='width', ax=ax[i], cut=0)
                     else:
                         ax[i].axis('off')
 
@@ -719,12 +738,11 @@ if make_fitnessdistribution_plot or full_short_manual in ('short', 'full'):
                 if lp < len(param_keys):
                     im1 = ax[arow,acol].scatter(x[param_keys[lp]].values, x['fitness'].values,
                         s=10.0, c=scatter_colors)
-                    ax[arow,acol].set_ylim(0, 1.1*np.max(x['fitness'].values))
-                    ax[arow,acol].axvspan(params_error[param_keys[lp]][0], params_error[param_keys[lp]][1], alpha=0.3, color='red')
+                    ax[arow,acol].set_ylim(0, 1.1*np.nanmax(x['fitness'].values))
                     ax[arow,acol].set_xlim(params_dic[param_keys[lp]][0], params_dic[param_keys[lp]][1])
                     ax[arow,acol].set_title(param_keys[lp])#, fontsize=14)
                     ax[arow,acol].axvspan(params_error[param_keys[lp]][0],
-                        params_error[param_keys[lp]][1], alpha=0.3, color='red')
+                        params_error[param_keys[lp]][1], alpha=0.6, color='orange', zorder=0)
 
                     print(param_keys[lp] + ' - ' + str(params_error[param_keys[lp]][2]) + '    [' + str(params_error[param_keys[lp]][0]) + ', ' +  str(params_error[param_keys[lp]][1]) + ']')
                 else:
@@ -1100,10 +1118,11 @@ if make_correlation_plot or full_short_manual in ('short', 'full'):
                                 median_tmp = float('nan')
                             chi2_matrix[i1][i2] = median_tmp
 
-                    if which_plot == 'chi2' and (np.log10(np.nanmax(chi2_matrix)) - np.log10(np.nanmin(chi2_matrix)) > 2.0):
+                    if which_plot == 'chi2':# and (np.log10(np.nanmax(chi2_matrix)) - np.log10(np.nanmin(chi2_matrix)) > 2.0):
                         # Fidle with scale of correlation plot
                         # if the differences between the chi2s are very large, it may be
                         # better to use a log scale
+
                         chi2_matrix = np.log10(chi2_matrix)
                         #print("Using log scale for correlation plot ")
                     else:
