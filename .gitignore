@@ -3,6 +3,7 @@
 *.DS_Store
 *.swp
 inicalc/*
+FW_inicalc/*
 output/*
 input/*
 old/*

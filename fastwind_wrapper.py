@@ -71,7 +71,6 @@ def read_control_pars(control_source):
     ctrldct["b_gauss_na"] = float(ctrldct["b_gauss_na"])
     ctrldct["mut_rate_na"] = float(ctrldct["mut_rate_na"])
     ctrldct["mut_rate_init"] = float(ctrldct["mut_rate_init"])
-    ctrldct["doerr_factor"] = float(ctrldct["doerr_factor"])
     ctrldct["mut_rate_min"] = float(ctrldct["mut_rate_min"])
     ctrldct["mut_rate_max"] = float(ctrldct["mut_rate_max"])
     ctrldct["mut_rate_factor"] = float(ctrldct["mut_rate_factor"])
@@ -316,9 +315,9 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
         f.write(modname + '\n')
         windt = float(dct['windturb'])
         if windt > 0.0 and windt < 1.0:
-            turbstring = dct['vturb'] + ' ' + dct['windturb'] + '\n'
+            turbstring = dct['micro'] + ' ' + dct['windturb'] + '\n'
         else:
-            turbstring = dct['vturb'] + '\n'
+            turbstring = dct['micro'] + '\n'
         f.write(turbstring)
         f.write(dct['do_iescat'] + '\n')
 
@@ -349,8 +348,8 @@ def read_linelist(theflinelist):
 
 def parallelcrop(list1, list2, list3, start_list1, stop_list1):
 
-    minarg = np.argmin(np.abs(list1-start_list1))
-    maxarg = np.argmin(np.abs(list1-stop_list1))
+    minarg = np.argmax(list1>start_list1)
+    maxarg = np.argmax(list1>stop_list1)
 
     newlist1 = list1[minarg:maxarg]
     newlist2 = list2[minarg:maxarg]
@@ -824,7 +823,7 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     clean_run(moddir, mname, savedir, out)
     store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname)
 
-    return fitinfo[0]
+    return fitinfo[0], fitinfo[3]
 
 def add_to_dict(dictname, entryname, entryval):
     """Add an entry to a dictionary"""
@@ -945,14 +944,16 @@ def init_mod_dir(inidir, therundir, modname):
     mkdir(moddir + modname)
     return moddir
 
-def create_FORMAL_INPUT(inidir, line_subset):
+def create_FORMAL_INPUT(inidir, line_subset, create=True):
     """Create a FORMAL_INPUT file that contains only the lines that
     will be fitted. Based on the linelist we go through the
     FORMAL_INPUT "master" file and only copy those that we need to
     the FORMAL_INPUT that we will use.
     Furthermore, the function checks whether all lines that are in 
     the line_subset (the diagnositc lines) are present in the 
-    FORMAL_INPUT_master file, if not, it exits the run. 
+    FORMAL_INPUT_master file, if not, it exits the run.
+    If the parameter 'create' is false, only a check is done, 
+    and the FORMAL input file is not really created. 
     """
 
     # Navigate to the main inicalc directory, the one that will
@@ -990,12 +991,13 @@ def create_FORMAL_INPUT(inidir, line_subset):
                     continueline = False
                 formal_new.append(line)
 
-    # Write the collected lines to the new FORMAL_INPUT file.
-    # This is the file that will be used during the run.
-    with open('FORMAL_INPUT', 'w') as f:
-        for aline in formal_new:
-            f.write("%s" % aline)
-        f.write("\n")
+    if create:
+        # Write the collected lines to the new FORMAL_INPUT file.
+        # This is the file that will be used during the run.
+        with open('FORMAL_INPUT', 'w') as f:
+            for aline in formal_new:
+                f.write("%s" % aline)
+            f.write("\n")
 
     # Navigate back to the main directory
     os.chdir('..')
@@ -1006,11 +1008,18 @@ def create_FORMAL_INPUT(inidir, line_subset):
             missing_lines.append(aline)
 
     if missing_lines != []:
-        print('Some diagnostic lines are not found in FORMAL_INPUT_master!')
+        print('ERROR! Some diagnostic lines are not ' + 
+            'found in FORMAL_INPUT_master!')
         for missing in missing_lines:
             print(missing + ' not found')
-        print('Exiting pyEA... :-(')
-        sys.exit()
+        if not create:
+            return False
+        else:
+            print('Exiting pyEA... :-(')
+            sys.exit()
+    if not create:
+        print('All lines are present in FORMAL_INPUT_master')
+        return True
 
 def read_mut_gen(mut_gen_file):
     """ Function for restarting the run. Reads mutation rate and

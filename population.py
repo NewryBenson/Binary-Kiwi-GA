@@ -196,42 +196,21 @@ def crossover(mother_genes, father_genes, clone_fraction):
 
     return babygirl_genes, babyboy_genes
 
-def stepsize_mutation(baby_genes, paramspace, mutation_rate):
-    """ Creep mutation changes a gene by one stepsize """
+def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
+        gbase, gtype):
+    """ Changes (with a certain probability) the value of parameters,
+    hereby following a gaussian distribution around the current value 
+    of the parameter that will mutate. 
+    
+    Input are the parameters of an individual, then each 
+    parameter has a chance of mutation_rate to mutate, with a 
+    gaussian with a certain width. The width is specified either in 
+    terms of a fraction of the parameter space width (then determined
+    for each parameter), or in terms of steps, so depending on the grid 
+    of each parameter ('gtype').
 
-    mutated_genes = []
-
-    # Loop through all genes (parameters) of the model
-    for i in range(len(paramspace)):
-
-        # A mutation only occurs in a fraction (mutation_rate) of
-        # the genes.
-        if random.random() < mutation_rate:
-            the_p_min = paramspace[i][0]
-            the_p_max = paramspace[i][1]
-            the_p_step = paramspace[i][2]
-            the_p_rounding = int(paramspace[i][3])
-
-            # Either increase or decrease the parameter by one step,
-            # if this does not bring the model outside of the
-            # parameter space
-            sign = np.random.choice([-1,1], 1)[0]
-            mutated_gene = baby_genes[i] + sign*the_p_step
-            mutated_gene = round(mutated_gene, the_p_rounding)
-
-            if not (mutated_gene < the_p_min or mutated_gene > the_p_max):
-                mutated_genes.append(mutated_gene)
-            else:
-                mutated_genes.append(baby_genes[i])
-        else:
-            mutated_genes.append(baby_genes[i])
-
-    return mutated_genes
-
-def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_frac,
-        gbase):
-    """ Mutation by x step sizes, where the chance is weighted
-    by 1./x, so that larger changes are less likely. """
+    Output is the mutated genome (parameters of the individual). 
+    """ 
 
     mutated_genes = []
 
@@ -249,11 +228,19 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_frac,
             nsteps = (the_p_max-the_p_min)/the_p_step+1
             param_space = np.linspace(the_p_min, the_p_max, nsteps)
             param_space = param_space[param_space != baby_genes[i]]
-            gauss_width = (the_p_max-the_p_min)*gwidth_frac
+            if gtype == 'frac':
+                gauss_width = (the_p_max-the_p_min)*gwidth
+            else: 
+                # If not 'frac', this means: gtype == 'step'
+                gauss_width = the_p_step*gwidth
             props = gauss(param_space, gbase, 1., baby_genes[i], gauss_width)
             props = props / np.sum(props)
 
             mutated_gene = np.random.choice(param_space, 1, p=props)[0]
+            
+            # The rounding is mainly done for the mass loss, which 
+            # has a different input format in FW than it has in the 
+            # parameter space (there it is in 10log)
             mutated_gene = round(mutated_gene, the_p_rounding)
 
             # This is a check, but actually the code should never
@@ -263,33 +250,8 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth_frac,
             if not (mutated_gene < the_p_min or mutated_gene > the_p_max):
                 mutated_genes.append(mutated_gene)
             else:
-                print('ERROR IN gaussian_mutataion: outside range')
+                print('ERROR in gaussian_mutataion: outside range')
                 mutated_genes.append(baby_genes[i])
-        else:
-            mutated_genes.append(baby_genes[i])
-
-    return mutated_genes
-
-def uniform_mutation(baby_genes, paramspace, mutation_rate):
-    """Mutates a fraction of the genes uniformly, i.e. a genes value is
-    replaced by a random other value in the parameter range
-    """
-
-    mutated_genes = []
-    # Loop through all genes (parameters) of the model
-    for i in range(len(paramspace)):
-
-        # A mutation only occurs in a fraction (mutation_rate) of
-        # the genes.
-        if random.random() < mutation_rate:
-            the_p_min = paramspace[i][0]
-            the_p_max = paramspace[i][1]
-            the_p_step = paramspace[i][2]
-            the_p_rounding = int(paramspace[i][3])
-
-            new_gene = rand_from_range(the_p_min, the_p_max, the_p_step,
-                the_p_rounding)
-            mutated_genes.append(new_gene)
         else:
             mutated_genes.append(baby_genes[i])
 
@@ -297,7 +259,7 @@ def uniform_mutation(baby_genes, paramspace, mutation_rate):
 
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, mut_rate_na,
-    n_ind):
+    n_ind, na_type, br_type):
     """Given a population of individuals and a measure for their
     fitness, generate a new generation of individuals.
 
@@ -337,26 +299,8 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         baby_genes1, baby_genes2 = crossover(mother_genes, father_genes,
             clone_fraction)
 
-        # Mutate the baby genomes. There are two modes of mutation,
-        # creep mutation and uniform mutataion, each genome is affected
-        # by both. The probability that each gene mutates is equal to
-        # the mutation_rate, this hold for both modes.
-        # The probability that one none of the genes of a individual
-        # mutate if it is affected by both these thus equal to
-        # (1-mutation_rate)^(2*number of genes).
-
-        # 'uniform_factor' is the factor with which the mutation rate
-        # is lowered for so called uniform mutation. This kind of
-        # mutation is quite agressive therefore you don't want it
-        # to happen to often. (maybe not at all?)
-        #mutation_rate_u = mutation_rate * uniform_factor
-
-        #baby_genes1 = uniform_mutation(baby_genes1, paramspace, mutation_rate_u)
-        #baby_genes2 = uniform_mutation(baby_genes2, paramspace, mutation_rate_u)
-
-        #baby_genes1 = stepsize_mutation(baby_genes1, paramspace, mutation_rate)
-        #baby_genes2 = stepsize_mutation(baby_genes2, paramspace, mutation_rate)
-
+        # Mutate the baby genomes. There are two modes of mutation.
+        # Load values defining the distributions for the two types. 
         gauss_w_na = float(gauss_w_na)
         gauss_w_br = float(gauss_w_br)
         gauss_b_na = float(gauss_b_na)
@@ -365,17 +309,17 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
 
         # Narrow mutation: close to original value, high mutation
         # rate that is in principle fixed 
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, mut_rate_na,
-            gauss_w_na, gauss_b_na)
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, mut_rate_na,
-            gauss_w_na, gauss_b_na)
+        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
+            mut_rate_na, gauss_w_na, gauss_b_na, na_type)
+        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
+            mut_rate_na, gauss_w_na, gauss_b_na, na_type)
         
         # Broad mutation: further away from original value, lower 
         # mutation rate that is variable
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, mutation_rate, 
-            gauss_w_br, gauss_b_br)
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, mutation_rate, 
-            gauss_w_br, gauss_b_br)
+        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
+            mutation_rate, gauss_w_br, gauss_b_br, br_type)
+        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
+            mutation_rate, gauss_w_br, gauss_b_br, br_type)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
         if not dup_tf:
@@ -502,48 +446,6 @@ def assess_variation(fullgeneration, paramspace, fittest_ind):
 
     return diff_per_ind
 
-def do_reproduce_doerr(mrate, doerfact, thegen, thefit, clfrac,
-    pspace, theduplfile):
-    """Split the genetarion into two pools, and apply on each
-    of those pools different mutation rates, according to
-    Doerr+2019."""
-
-    num_ind = len(thegen)
-    mutation_rate_a = mrate/doerfact
-    mutation_rate_b = mrate*doerfact
-    generation_a = reproduce(thegen, thefit, mutation_rate_a,
-        clfrac, pspace, theduplfile)[:num_ind/2]
-    generation_b = reproduce(thegen, thefit, mutation_rate_b,
-        clfrac, pspace, theduplfile)[:num_ind-(num_ind/2)]
-
-    return generation_a, generation_b, mutation_rate_a, mutation_rate_b
-
-def adjust_mutation_doerr(fit_a, fit_b, mrate_a, mrate_b, minmut, maxmut):
-    """ Adjust the mutation rate, depending on the fitness of the
-    individuals of the two Doerr groups.
-    Currently has no implementation in the main code.
-    """
-
-    if np.median(fit_a) < np.median(fit_b):
-        mrate = mrate_a
-        if mrate < minmut:
-            mrate = minmut
-    elif np.median(fit_a) > np.median(fit_b):
-        mrate = mrate_b
-        if mrate > maxmut:
-            mrate = maxmut
-    return mrate
-
-def concat_gen_doerr(gen_a, gen_b, fit_a, fit_b):
-    """Merge the subgenerations of the Doerr mutation rate
-    into one."""
-
-    thegen = np.concatenate((gen_a, gen_b))
-    thefit = np.concatenate((fit_a, fit_b))
-
-    return thegen, thefit
-
-
 def adjust_mutation_genvariety(mutrate, cutdecr, cutincr, mutfactor,
     mutmin, mutmax, mean_gen_var, parspace):
     """ Adjust the mutation rate, depending on genetic genetic
@@ -567,13 +469,3 @@ def print_report(gennumber, bestfitness, medianfitness, verbose):
         print('Generation       ' + str(gennumber))
         print('Best fitness     ' + str(bestfitness))
         print('Median fitness   ' + str(medianfitness))
-
-
-
-
-
-
-
-
-
-#

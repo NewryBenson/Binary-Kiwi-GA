@@ -22,6 +22,12 @@ import fastwind_wrapper as fw
 
 ''' INITIALIZE / SET UP '''
 
+# Start MPIPool to control the distrubution of models over CPUs
+pool = MPIPool()
+if not pool.is_master():
+    pool.wait()
+    sys.exit(0)
+
 # Read command line arguments and exit if no input is found.
 parser = argparse.ArgumentParser(description='Run pika2')
 parser.add_argument('runname', help='Specify run name')
@@ -71,12 +77,6 @@ eval_fitness = functools.partial(fw.evaluate_fitness, cdict["inicalcdir"],
     lineinfo, dof, cdict["fitmeasure"], fd["chi2_out"], param_names)
 
 ''' THE GENETIC ALGORITHM STARTS HERE '''
-
-# Start MPIPool to control the distrubution of models over CPUs
-pool = MPIPool()
-if not pool.is_master():
-    pool.wait()
-    sys.exit(0)
 
 # When starting from scratch, the first generation is calculated
 if not args.c:
@@ -168,7 +168,8 @@ for agen in range(cdict["ngen"]):
     generation_o = pop.reproduce(generation, fitnesses, mutation_rate,
         cdict["clone_fraction"], param_space, fd["dupl_out"],
         cdict["w_gauss_na"], cdict["w_gauss_br"], cdict["b_gauss_na"],
-        cdict["b_gauss_br"], cdict["mut_rate_na"], cdict["nind"])
+        cdict["b_gauss_br"], cdict["mut_rate_na"], cdict["nind"],
+        cdict["narrow_type"], cdict["broad_type"])
     modnames = fw.gen_modnames(gencount, cdict["nind"])
 
     names_genes = []
