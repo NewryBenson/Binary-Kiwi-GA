@@ -8,6 +8,7 @@ output/*
 input/*
 old/*
 misc/*
+slurm/*
 slurm-*out
 *.jpg
 *.job

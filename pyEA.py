@@ -34,10 +34,16 @@ parser.add_argument('runname', help='Specify run name')
 parser.add_argument('-c', action='store_true', help='Continue run')
 args = parser.parse_args()
 inputdir = paths.inputdir + args.runname + '/'
-fw.check_indir(inputdir)
+if not fw.check_indir(inputdir):
+    pool.close()
+    sys.exit()
 
 # Initial setup of directories and file paths
-outputdir = paths.outputdir + args.runname + '/'
+# If you want to make a subdirectory, you have to take this 
+# into account when going back to the main directory after 
+# fastwind has run (in the function execute_fastwind)
+outputdir = paths.outputdir
+#outputdir = paths.outputdir + args.runname + '/'
 fd = fw.make_file_dict(inputdir, outputdir)
 fw.mkdir(paths.outputdir)
 fw.mkdir(outputdir)
@@ -92,18 +98,20 @@ if not args.c:
     names_genes = []
     for mname, gene in zip(modnames, generation):
         names_genes.append([mname, gene])               
-    fitnesses = list(pool.map(eval_fitness, names_genes))
+    parallelout = list(pool.map(eval_fitness, names_genes))
+    fitmeasures, red_chi2s = np.transpose(parallelout)
     
     # If the first generation is larger than the typical generation,
     # The top nind fittest individuals of this generation are selected.
     if cdict["f_gen1"] > 1:
-        topfit = pop.get_top_x_fittest(generation, fitnesses, cdict["nind"])
-        generation, fitnesses = topfit
+        topfit = pop.get_top_x_fittest(generation, fitmeasures, cdict["nind"])
+        generation, fitmeasures = topfit
     
     # The fittest individual is selected
-    genbest, best_fitness = pop.get_fittest(generation, fitnesses)
-    pop.store_lowestchi2(fd["bestchi2_out"], best_fitness, 0)
-    pop.print_report(gencount, best_fitness, np.median(fitnesses),
+    genbest, best_fitness = pop.get_fittest(generation, fitmeasures)
+    lowest_redchi2 = np.min(red_chi2s)
+    pop.store_lowestchi2(fd["bestchi2_out"], lowest_redchi2, 0)
+    pop.print_report(gencount, best_fitness, np.median(fitmeasures),
         cdict["be_verbose"])
 
     mutation_rate = cdict["mut_rate_init"] # initial mutation rate
@@ -112,22 +120,15 @@ if not args.c:
     os.system('cp ' + fd["chi2_out"] + ' ' + fd["chi2_cont"])
     os.system('cp ' + fd["dupl_out"] + ' ' + fd["dupl_cont"]) 
     np.savetxt(fd["gen_cont"], generation)
-    np.savetxt(fd["fit_cont"], fitnesses)
-
-    # The user can create a file STOP.pyEA in the main dir. 
-    # If this file is found the run will be stopped at the end 
-    # of the current generation. 
-    # if os.path.isfile('STOP.pyEA'):
-    #    pool.close()
-    #    sys.exit()
+    np.savetxt(fd["fit_cont"], fitmeasures)
 
 # When continuing an old run, simply pick up the gencount, mutation
-# rate and the fitnesses and parameters of the last generation. 
+# rate and the fitmeasures and parameters of the last generation. 
 else:
     gencount, mutation_rate = fw.read_mut_gen(fd["mutation_out"])
     generation = np.genfromtxt(fd["gen_cont"])
-    fitnesses = np.genfromtxt(fd["fit_cont"])
-    genbest, best_fitness = pop.get_fittest(generation, fitnesses)
+    fitmeasures = np.genfromtxt(fd["fit_cont"])
+    genbest, best_fitness = pop.get_fittest(generation, fitmeasures)
 
 for agen in range(cdict["ngen"]):
 
@@ -154,7 +155,7 @@ for agen in range(cdict["ngen"]):
     # If the chosen scheme is 'constant', no adaption is made. 
     if cdict["mut_adjust_type"] == 'carbonneau':
         mutation_rate = pop.adjust_mutation_rate_carbonneau(mutation_rate,
-            fitnesses, cdict["mut_rate_factor"], cdict["mut_rate_min"],
+            fitmeasures, cdict["mut_rate_factor"], cdict["mut_rate_min"],
             cdict["mut_rate_max"], cdict["fit_cutoff_min_carb"],
             cdict["fit_cutoff_min_carb"])
     
@@ -165,43 +166,47 @@ for agen in range(cdict["ngen"]):
             cdict["mut_rate_max"], mean_gen_variety, param_space)
 
     # Reproduce and asses fitness
-    generation_o = pop.reproduce(generation, fitnesses, mutation_rate,
+    generation_o = pop.reproduce(generation, fitmeasures, mutation_rate,
         cdict["clone_fraction"], param_space, fd["dupl_out"],
         cdict["w_gauss_na"], cdict["w_gauss_br"], cdict["b_gauss_na"],
         cdict["b_gauss_br"], cdict["mut_rate_na"], cdict["nind"],
-        cdict["narrow_type"], cdict["broad_type"])
+        cdict["narrow_type"], cdict["broad_type"], cdict["doublebroad"])
     modnames = fw.gen_modnames(gencount, cdict["nind"])
 
     names_genes = []
     for mname, gene in zip(modnames, generation_o):
         names_genes.append([mname, gene])
-    fitnesses_o = list(pool.map(eval_fitness, names_genes))
+    parallelout = list(pool.map(eval_fitness, names_genes))
+    fitmeasures_o, red_chi2s_o = np.transpose(parallelout)
 
-    # The parent population (generation, fitnesses), is created 
-    # based on the offpsring pop. (generation_o, fitnesses_o)
+    # The parent population (generation, fitmeasures), is created 
+    # based on the offpsring pop. (generation_o, fitmeasures_o)
     if cdict["ratio_po"] == 1.0 and cdict["f_parent"] == 0.0:
         # Case of pure reinsertion: offspring pop = parent pop.,
         # but the fittest individual of the run always survives
         # (This only has to be done explictly if the pure reinsertion
         # scheme is used, otherwise this is the case automatically.)
-        generation, fitnesses = pop.reincarnate(generation_o, fitnesses_o,
+        generation, fitmeasures = pop.reincarnate(generation_o, fitmeasures_o,
             genbest, best_fitness)
+        red_chi2s = red_chi2s_o
     else:
         # In the other cases, i.e. when the reinsertion schemes of 
         # elitist and fitness-based are combined, the best inidividuals
         # of the parent population and the offspring are combined. 
-        generation_o, fitnesses_o = pop.get_top_x_fittest(generation_o, 
-            fitnesses_o, cdict["n_keep_offspring"])
-        generation, fitnesses = pop.get_top_x_fittest(generation, fitnesses, 
+        generation_o, fitmeasures_o = pop.get_top_x_fittest(generation_o, 
+            fitmeasures_o, cdict["n_keep_offspring"])
+        generation, fitmeasures = pop.get_top_x_fittest(generation, fitmeasures, 
             cdict["n_keep_parent"])
         generation = np.concatenate((generation, generation_o))
-        fitnesses  = np.concatenate((fitnesses, fitnesses_o))
+        fitmeasures  = np.concatenate((fitmeasures, fitmeasures_o))
+        red_chi2s = np.concatenate((red_chi2s, red_chi2s_o))
     
-    genbest, best_fitness = pop.get_fittest(generation, fitnesses)
-    pop.store_lowestchi2(fd["bestchi2_out"], best_fitness, gencount)
+    genbest, best_fitness = pop.get_fittest(generation, fitmeasures)
+    best_rchi2 = np.min(red_chi2s)
+    pop.store_lowestchi2(fd["bestchi2_out"], best_rchi2, gencount)
 
-    pop.store_genvar(fd["genvar_out"], gencount, gen_variety, fitnesses)
-    pop.print_report(gencount, best_fitness, np.median(fitnesses),
+    pop.store_genvar(fd["genvar_out"], gencount, gen_variety, fitmeasures)
+    pop.print_report(gencount, best_fitness, np.median(fitmeasures),
         cdict["be_verbose"])
 
     # Store mutation rate and files for run continuation
@@ -211,7 +216,7 @@ for agen in range(cdict["ngen"]):
     os.system('cp ' + fd["chi2_out"] + ' ' + fd["chi2_cont"])
     os.system('cp ' + fd["dupl_out"] + ' ' + fd["dupl_cont"]) 
     np.savetxt(fd["gen_cont"], generation)
-    np.savetxt(fd["fit_cont"], fitnesses)
+    np.savetxt(fd["fit_cont"], fitmeasures)
 
     # The user can create a .STOP-file in the main dir. 
     # The  file should contain the number, with the maximum
@@ -219,19 +224,20 @@ for agen in range(cdict["ngen"]):
     # this amount of generations has been calculated. 
     # Simply set to 0 if you want to stop at the end of the
     # current generation. 
-    stopfile = args.runname + '.STOP'
+    stopfile = 'pyEA.STOP'
     if os.path.isfile(stopfile):
-        try:
-            stopinfo = np.genfromtxt(stopfile)
-            if int(stopinfo) <= gencount:
-                os.system('rm ' + stopfile)
-                pool.close()
-                sys.exit()
-            else:
-                pass 
-        except:
-            print("Something was wrong with " + stopfile)
-            print("Continuing run as if there was no stopfile.")
+        if os.path.getsize(stopfile) > 0:
+            try:
+                stopinfo = np.genfromtxt(stopfile)
+                if int(stopinfo) <= gencount:
+                    os.system('rm ' + stopfile)
+                    pool.close()
+                    sys.exit()
+                else:
+                    pass 
+            except:
+                print("Something was wrong with " + stopfile)
+                print("Continuing run as if there was no stopfile.")
 
 pool.close()
 

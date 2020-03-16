@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=sim_H52_SNR30_d
-#SBATCH -t 120:00:00
-#SBATCH -n 96
+#SBATCH --job-name=sim_UV_opt_1
+#SBATCH -t 72:00:00
+#SBATCH -n 120
 #SBATCH --no-requeue 
 
-runname=sim_H52_SNR30_d
+runname=sim_UV_opt_1
 do_restart=no
-ncpu=96
+ncpu=120
 inidir=FW_inicalc
 
 echo Run ${runname}
@@ -27,7 +27,9 @@ echo Copying files
 mkdir -p $scratch 
 cp -r ${homedir}*.py $scratch
 cp -r ${homedir}filter_transmissions $scratch
-cp -r ${homedir}input $scratch
+mkdir -p ${scratch}input/
+mkdir -p ${scratch}input/${runname}/
+cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.
 cp -r ${homedir}${inidir} $scratch
 
 # Navigate to computation directory 

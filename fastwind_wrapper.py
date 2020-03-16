@@ -459,12 +459,15 @@ def execute_fastwind(atom, fwtimeout, moddir):
     os.system(do_pformal)
 
     # Return to the main directory
-    os.chdir('../../../../../')
+    os.chdir('../../../../')
 
 def read_fwline(OUT_file):
     '''Get wavelength and normflux from OUT. file'''
     tmp_matrix = np.genfromtxt(OUT_file, max_rows=161).T
-    wave, flux = tmp_matrix[2], tmp_matrix[4]
+    if tmp_matrix.size == 0:
+        wave, flux = [0], [0]
+    else:
+        wave, flux = tmp_matrix[2], tmp_matrix[4]
     return wave, flux
 
 def prep_broad(linename, line_file, moddir):
@@ -473,7 +476,10 @@ def prep_broad(linename, line_file, moddir):
     """
     out_clean = moddir + 'profiles/' + linename + '.prof'
     wave, flux = read_fwline(line_file)
-    np.savetxt(out_clean, np.array([wave, flux]).T)
+    if len(wave) == 1:
+        out_clean = 'skip'
+    else:
+        np.savetxt(out_clean, np.array([wave, flux]).T)
     return out_clean
 
 def apply_broadening(mname, moddir, linenames, lineres):
@@ -493,7 +499,6 @@ def apply_broadening(mname, moddir, linenames, lineres):
     # Look up all FW line output and exit if there is none.
     linefiles = glob.glob(moddir + 'OUT.*')
     if len(linefiles) == 0:
-        #os.chdir('..')
         return 0
 
     # These likely have a different order than the filenames
@@ -507,13 +512,6 @@ def apply_broadening(mname, moddir, linenames, lineres):
     # If this command takes longer than 5 min than certainly
     # something is wrong
     do_broaden = 'timeout 5m python broaden.py -f '
-    # ----------------------------------------------------
-    # #FIXME This is a workaround for testing on OS X,
-    # where the timeout command is not available, only
-    # gtimeout is. Can be removed when using on linux
-    if sys.platform == "darwin":
-        do_broaden = 'gtimeout 5m python broaden.py -f '
-    # ----------------------------------------------------
 
     # Read in the broadening properties for the model.
     vrot, vmacro = np.genfromtxt(inicalcdir + 'broad.in')
@@ -532,11 +530,13 @@ def apply_broadening(mname, moddir, linenames, lineres):
     # Loop through the OUT. files and apply broadening
     for linename, linefle in zip(linenames_fromfile, linefiles):
         # Convert to readable format
-        input = prep_broad(linename, linefle, moddir)
+        finput = prep_broad(linename, linefle, moddir)
+        if finput == 'skip':
+            return 0
         # Lookup resolving power
         do_res = ' -r ' + str(resdct[linename])
         # Apply broadening
-        broadcommand = do_broaden + input + do_res + do_vrot + do_macro
+        broadcommand = do_broaden + finput + do_res + do_vrot + do_macro
         os.system(broadcommand)
 
     return 1
@@ -596,7 +596,7 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
 
     chi2_line = np.sum(((flux_data - flux_mod) / (error_data))**2)
     np_line = len(flux_data)
-    dof_line = lenfp + np_line
+    dof_line = np_line - lenfp
     rchi2_line = chi2_line / dof_line
 
     if len(wave_mod) > maxlen:
@@ -764,7 +764,10 @@ def grep_pnlte(moddir, search, outputfile, loc):
     tail = 'tail -1 ' + tmp + ' > ' + txt + ' ; '
     rm = 'rm ' + tmp
     os.system(grep + tail + rm)
-    value = np.genfromtxt(txt)[loc]
+    if os.path.getsize(txt) > 0:
+        value = np.genfromtxt(txt)[loc]
+    else:
+        value = ""
     return str(value)
 
 def get_runinfo(moddir):
@@ -777,14 +780,20 @@ def get_runinfo(moddir):
     if os.path.exists(moddir + 'pnlte.log'):
         try:
             maxcor = grep_pnlte(moddir, "CORR. MAX:", 'corr_max', -1)
+            if maxcor == '':
+                maxcor = '0.0' 
         except:
             maxcor = '0.0'
         try:
             maxit = grep_pnlte(moddir, "+  ITERATION NO", 'it_max', -2)
+            if maxit == '':
+                maxit = '0'
         except:
             maxit = '0'
         try:
             cputime = grep_pnlte(moddir, "CPU time", 'cpu', -1)
+            if cputime == '':
+                cputime = '99999.9'
         except:
             cputime = '99999.9'
     else:
@@ -898,7 +907,8 @@ def check_indir(indir):
         print("No input directory found!")
         print("I was searching here: " + indir)
         print("Exiting")
-        sys.exit()
+        return False
+    return True
 
 def copy_input(adict, theindir):
     """Copy the input directory to the output directory.
@@ -1026,7 +1036,14 @@ def read_mut_gen(mut_gen_file):
     generation number of last generation
     """
     mutgenlines = np.genfromtxt(mut_gen_file)
-    for mutgen in mutgenlines:
-        gen = int(mutgen[0])
-        mutrate = mutgen[1]
+    lenmut  = len(np.array(mutgenlines.shape))
+
+    # If multiple generations have been computed already, take 
+    # the last line of the file only.     
+    if lenmut == 2:
+        mutgenlines = mutgenlines[-1]
+    
+    gen = int(mutgenlines[0])
+    mutrate = mutgenlines[1]    
+
     return gen, mutrate
