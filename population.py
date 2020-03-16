@@ -16,6 +16,20 @@ def gauss(x,baseline,height,center,sigma):
     y = baseline + height * np.exp(-(x-center)**2 / (2*sigma**2))
     return y
 
+def double_gauss(x,baseline,height,center,sigma):
+    """
+    Gaussian with continuum at 0.
+    """
+    center1 = center-0.75*sigma
+    center2 = center+0.75*sigma
+
+    sigma = 0.4*sigma
+
+    y = (baseline + height * np.exp(-(x-center1)**2 / (2*sigma**2)) + 
+        height * np.exp(-(x-center2)**2 / (2*sigma**2)))
+
+    return y
+
 
 def rmfile(filename):
     """ Remove a file """
@@ -197,7 +211,7 @@ def crossover(mother_genes, father_genes, clone_fraction):
     return babygirl_genes, babyboy_genes
 
 def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
-        gbase, gtype):
+        gbase, gtype, double_yn):
     """ Changes (with a certain probability) the value of parameters,
     hereby following a gaussian distribution around the current value 
     of the parameter that will mutate. 
@@ -225,7 +239,7 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
             the_p_step = paramspace[i][2]
             the_p_rounding = int(paramspace[i][3])
 
-            nsteps = (the_p_max-the_p_min)/the_p_step+1
+            nsteps = int(round((the_p_max-the_p_min)/the_p_step+1,0))
             param_space = np.linspace(the_p_min, the_p_max, nsteps)
             param_space = param_space[param_space != baby_genes[i]]
             if gtype == 'frac':
@@ -233,7 +247,12 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
             else: 
                 # If not 'frac', this means: gtype == 'step'
                 gauss_width = the_p_step*gwidth
-            props = gauss(param_space, gbase, 1., baby_genes[i], gauss_width)
+            if double_yn == 'yes':
+                props = double_gauss(param_space, gbase, 1., 
+                    baby_genes[i], gauss_width)
+            else:
+                props = gauss(param_space, gbase, 1., baby_genes[i], 
+                    gauss_width)
             props = props / np.sum(props)
 
             mutated_gene = np.random.choice(param_space, 1, p=props)[0]
@@ -259,7 +278,7 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
 
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, mut_rate_na,
-    n_ind, na_type, br_type):
+    n_ind, na_type, br_type, dgauss):
     """Given a population of individuals and a measure for their
     fitness, generate a new generation of individuals.
 
@@ -310,16 +329,16 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         # Narrow mutation: close to original value, high mutation
         # rate that is in principle fixed 
         baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
-            mut_rate_na, gauss_w_na, gauss_b_na, na_type)
+            mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
         baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
-            mut_rate_na, gauss_w_na, gauss_b_na, na_type)
+            mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
         
         # Broad mutation: further away from original value, lower 
         # mutation rate that is variable
         baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
-            mutation_rate, gauss_w_br, gauss_b_br, br_type)
+            mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
         baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
-            mutation_rate, gauss_w_br, gauss_b_br, br_type)
+            mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
         if not dup_tf:

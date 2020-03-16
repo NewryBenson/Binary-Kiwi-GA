@@ -176,11 +176,13 @@ checkdict['Step size'] = True
 for i in range(len(param_space)):
     stepsize = param_space[i][2]
     pwidth = np.abs(param_space[i][1] - param_space[i][0])
-    if pwidth/stepsize != int(pwidth/stepsize):
+    if np.abs(pwidth/stepsize - np.round(pwidth/stepsize,0)) > 0.0001:
         print('   - ' + param_names[i] + ': ERROR: step size cannot divide'
             ' parameter range into equal parts')
         print('     start: ' + str(param_space[i][0]) + ', stop: ' + 
              str(param_space[i][1]) + ', step: ',  str(param_space[i][2]) )
+        print(np.abs(pwidth/stepsize))
+        print(int(pwidth/stepsize))
         checkdict['Step size'] = False
     stepfrac = 1.0*stepsize/pwidth
     if stepsize < 0:
@@ -251,6 +253,7 @@ w_gauss_na = ctrldct["w_gauss_na"]
 w_gauss_br = ctrldct["w_gauss_br"]
 b_gauss_na = ctrldct["b_gauss_na"]
 b_gauss_br = ctrldct["b_gauss_br"]
+do_doublebroad = ctrldct["doublebroad"]
 nbins=[]
 ccol = ncols - 1
 crow = -1
@@ -284,7 +287,11 @@ for i in range(ncols*nrows):
     b_br = b_gauss_br
     xgauss = np.linspace(start, stop, 1000)
     na_gauss = pop.gauss(xgauss, b_na, 1.0, start+int(nbin/2)*step, sig_na)
-    br_gauss = pop.gauss(xgauss, b_br, 1.0, start+int(nbin/2)*step, sig_br)
+    if do_doublebroad == 'yes':
+        br_gauss = pop.double_gauss(xgauss, b_br, 1.0, start+int(nbin/2)*step, 
+            sig_br)
+    else:
+        br_gauss = pop.gauss(xgauss, b_br, 1.0, start+int(nbin/2)*step, sig_br)
     br_gauss = br_gauss / max(br_gauss)
     na_gauss = na_gauss / max(na_gauss)
 
@@ -321,6 +328,7 @@ nrows =int(math.ceil(1.0*len(names)/ncols))
 ccol = ncols - 1
 crow = -1
 props = dict(facecolor='white', alpha=1.0)
+errprops = dict(facecolor='red', alpha=1.0)
 fig, ax = plt.subplots(nrows, ncols, figsize=(3*ncols, 3*nrows))
 
 extra_AA = 2.0
@@ -349,7 +357,18 @@ for i in range(ncols*nrows):
     swave, sflux, serr = fw.parallelcrop(specwave, specflux, specerr,
         lbound-extra_AA, rbound+extra_AA)
 
-    if weight != 1.0:
+    npoint_error = False
+    if not len(wave) > len(param_names) + 1:
+        print('\nERROR! Too few data points for this line compared to' 
+            'the amount of free parameters.')
+        print('Line: ' + linename)
+        print('Data points: ' + str(len(wave)))
+        print('Free params: ' + str(len(param_names))+'\n')
+        npoint_error = True
+    
+    if npoint_error:
+        ax[crow,ccol].axvspan(lbound,rbound, color='red', alpha=0.6)
+    elif weight != 1.0:
         ax[crow,ccol].axvspan(lbound,rbound, color='green', alpha=0.3)
     else:
         ax[crow,ccol].axvspan(lbound,rbound, color='gold', alpha=0.3)
@@ -365,6 +384,11 @@ for i in range(ncols*nrows):
     boxtext = 'R = ' + str(resolution) + ',\n weight = ' + str(weight)
     ax[crow,ccol].text(0.05, 0.05, boxtext,
         transform=ax[crow,ccol].transAxes, fontsize=8, bbox=props)
+    if npoint_error:
+        errortext = 'Not enough data points\n compared to #free parameters'
+        ax[crow,ccol].text(0.5, 0.5, errortext, ha='center',
+            transform=ax[crow,ccol].transAxes, fontsize=8, bbox=errprops,
+            color='white')
 
 fig.suptitle('Spectrum check: ' + run_name, fontsize=14)
 fig.tight_layout(rect=[0, 0.03, 1, 0.93])
