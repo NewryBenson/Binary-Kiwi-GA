@@ -581,7 +581,7 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     # If the wavelength range of the model is smaller than the data,
     # then crop the data so that interpolation of the model can 
     # be done without problems. 
-    if not min(wave_data) > min(wave_mod) and max(wave_data) < max(wave_mod):
+    if min(wave_data) < min(wave_mod) or max(wave_data) > max(wave_mod):
         wave_data_c = wave_data[(wave_data > np.min(wave_mod)) & 
             (wave_data < np.max(wave_mod))]
         flux_data_c = flux_data[(wave_data > np.min(wave_mod)) & 
@@ -864,6 +864,7 @@ def make_file_dict(indir, outdir):
     dupl_contfile = 'dupl_cont.txt' 
     generation_contfile = 'savegen_cont.txt'
     fitnesses_contfile = 'savefitness_cont.txt'
+    redchi2_contfile = 'redchi2s_cont.txt'
 
     dct = {}
 
@@ -885,6 +886,7 @@ def make_file_dict(indir, outdir):
     dct = add_to_dict(dct, "dupl_cont", outdir + dupl_contfile)
     dct = add_to_dict(dct, "gen_cont", outdir + generation_contfile)
     dct = add_to_dict(dct, "fit_cont", outdir + fitnesses_contfile)
+    dct = add_to_dict(dct, "redchi_cont", outdir + redchi2_contfile)
 
     return dct
 

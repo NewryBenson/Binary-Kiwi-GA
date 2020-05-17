@@ -121,6 +121,7 @@ if not args.c:
     os.system('cp ' + fd["dupl_out"] + ' ' + fd["dupl_cont"]) 
     np.savetxt(fd["gen_cont"], generation)
     np.savetxt(fd["fit_cont"], fitmeasures)
+    np.savetxt(fd["redchi_cont"], red_chi2s)
 
 # When continuing an old run, simply pick up the gencount, mutation
 # rate and the fitmeasures and parameters of the last generation. 
@@ -128,19 +129,21 @@ else:
     gencount, mutation_rate = fw.read_mut_gen(fd["mutation_out"])
     generation = np.genfromtxt(fd["gen_cont"])
     fitmeasures = np.genfromtxt(fd["fit_cont"])
+    red_chi2s = np.genfromtxt(fd["redchi_cont"])
     genbest, best_fitness = pop.get_fittest(generation, fitmeasures)
 
-for agen in range(cdict["ngen"]):
-
+while gencount <= cdict["ngen"]:
+    
     gencount = gencount + 1
 
-    #fw.copy_input(fd,indir) 
-    #Commented out because we now change the copy directly!
-    
-    # Read control parameters: these, especially the mutation parameters,
-    # might be changed by the user during the run.
+    # Read control parameters: the user can change these duuring the run.
+    # !!! The control file is read from *input_copy* directory, 
+    #     so changing values in the input directory has no effect !
     cdict = fw.read_control_pars(fd["control_in"])
-    
+   
+    if gencount > cdict["ngen"]:
+        break
+ 
     # Re-initialise the fitness function with parameters that are
     # the same for every model. The control parameters, especially 
     # the fw_timeout, might be changed by the user during the run. 
@@ -217,27 +220,7 @@ for agen in range(cdict["ngen"]):
     os.system('cp ' + fd["dupl_out"] + ' ' + fd["dupl_cont"]) 
     np.savetxt(fd["gen_cont"], generation)
     np.savetxt(fd["fit_cont"], fitmeasures)
-
-    # The user can create a .STOP-file in the main dir. 
-    # The  file should contain the number, with the maximum
-    # generation number to compute. The run will stop when 
-    # this amount of generations has been calculated. 
-    # Simply set to 0 if you want to stop at the end of the
-    # current generation. 
-    stopfile = 'pyEA.STOP'
-    if os.path.isfile(stopfile):
-        if os.path.getsize(stopfile) > 0:
-            try:
-                stopinfo = np.genfromtxt(stopfile)
-                if int(stopinfo) <= gencount:
-                    os.system('rm ' + stopfile)
-                    pool.close()
-                    sys.exit()
-                else:
-                    pass 
-            except:
-                print("Something was wrong with " + stopfile)
-                print("Continuing run as if there was no stopfile.")
+    np.savetxt(fd["redchi_cont"], red_chi2s)
 
 pool.close()
 
