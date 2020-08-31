@@ -74,6 +74,7 @@ def read_control_pars(control_source):
     ctrldct["mut_rate_min"] = float(ctrldct["mut_rate_min"])
     ctrldct["mut_rate_max"] = float(ctrldct["mut_rate_max"])
     ctrldct["mut_rate_factor"] = float(ctrldct["mut_rate_factor"])
+    ctrldct["pure_reinsert_min"] = float(ctrldct["pure_reinsert_min"])
     ctrldct["fit_cutoff_min_carb"] = float(ctrldct["fit_cutoff_min_carb"])
     ctrldct["fit_cutoff_max_carb"] = float(ctrldct["fit_cutoff_max_carb"])
     ctrldct["cutoff_increase_genv"] = float(ctrldct["cutoff_increase_genv"])
@@ -198,6 +199,88 @@ def get_vinf(dct):
 
     return dct
 
+def convert_vclmax_scale(vclstart, vclextend):
+
+    maxrange = 1.0 - vclstart
+    vclmax = vclstart + (vclextend * maxrange)
+
+    vclmax = str(round(vclmax,4))
+
+    return vclmax
+
+def convert_vclmax_multi(vclstart, vclextend, factor):
+    
+    vclmax = min(round(factor * vclstart, 4), 1.0)
+    vclmax = str(vclmax)
+
+    return vclmax
+
+def convert_vclmax_add(vclstart, vclextend, addition):
+    
+    vclmax = min(round(vclstart + addition, 4), 1.0)
+    vclmax = str(vclmax)
+
+    return vclmax
+
+def get_vclmax(dct):
+    """ If the value for vclmax is -1, we adopt 2*vclstart 
+        If it can vary freely (between e.g. 0 and 1.0) then it is
+        checked that the chosen value is nog lower than vstart. If
+        it is, then it is adapted to a physical value. 
+    """
+
+    vclstart = float(dct['vclstart'])
+    vclmax = float(dct['vclmax'])
+
+    if vclmax == -1.0:
+        dct['vclmax'] = convert_vclmax_multi(vclstart, vclmax, 2.0)
+    elif vclmax >= 0.0 and vclmax <= 1.0:
+        if vclmax < vclstart:
+            # If vclmax is too low (i.e. lower than vclstart), the value
+            # is adapted by choosing vclmax = vclstart + 0.05
+            dct['vclmax'] = convert_vclmax_add(vclstart, vclmax, 0.05)
+            
+            # Alternative ways of adapting the vclmax value:
+            #   dct['vclmax'] = convert_vclmax_scale(vclstart, vclmax)
+            #   dct['vclmax'] = convert_vclmax_multi(vclstart, vclmax, 2.0)
+            # I chose for the _add option, as in this case, when reproduc-
+            # tion leads to a too low vclmax value, the value that is
+            # eventually used, is closer to the original value than in the
+            # case of scaling or multiplication, where the new value is
+            # closer to random. 
+
+        else:
+            # If it isn't smaller than vclstart, then  vclmax is kept 
+            # to the value picked originally by GA
+            pass
+
+    return dct
+
+def check_windturb(dct):
+    """ Check that the wind turbulence (maximum turbulence at vinf)
+        is not higher than the atmospheric turbulence. 
+        The wind turbulence can be given in units of vinf (when it 
+        is between 0.0 and 1.0) or in km/s. 
+    """
+
+    windturb = float(dct['windturb'])
+    vinf = float(dct['vinf'])
+    micro = float(dct['micro'])
+
+    if windturb > 1.0:
+        windturb_abs = vinf*windturb
+    else:
+        windturb_abs = windturb
+
+    if windturb_abs < micro: 
+        windturb = micro
+    else:
+        windturb = windturb_abs
+
+    dct['windturb'] = float(windturb)
+
+    return dct
+
 def calculate_mdot(dct, significant_digits=6):
     """ Given a mass loss rate in logspace, get the mass loss
     rate in Msun/year and round this to a certain amount of
@@ -260,6 +343,11 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     dct = calculate_mdot(dct)
 
     clumptype = clumping_type(dct['fic'])
+
+    # If vclmax = -1, get a value based on vclstart
+    # If vclmax is free, then adapt the range so that 
+    # it matched vclstart.
+    dct = get_vclmax(dct)
 
     # Creating lines to write to the inifile here.
     inl = ["'" + modname + "'\n"]
@@ -577,21 +665,28 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     """
     wave_data, flux_data, error_data = resdct[nme]
     wave_mod, flux_mod_orig = np.genfromtxt(linefile).T
-    
-    # If the wavelength range of the model is smaller than the data,
-    # then crop the data so that interpolation of the model can 
-    # be done without problems. 
+   
+    # If the wavelength range of the model is smaller than that of the 
+    # data, then add continuum at either side, so that an interpolation 
+    # can be done around the formally calculated line (the model predicts
+    # continuum, though this is 'cut off' when saving the line)
+    # (cropping the data to match the model range can give problems,
+    # when the amount of points that is left is less than the degrees
+    # of freedom. Furthermore, when doing this, effectively you throw out
+    # part of the data when fitting). 
+
     if min(wave_data) < min(wave_mod) or max(wave_data) > max(wave_mod):
-        wave_data_c = wave_data[(wave_data > np.min(wave_mod)) & 
-            (wave_data < np.max(wave_mod))]
-        flux_data_c = flux_data[(wave_data > np.min(wave_mod)) & 
-            (wave_data < np.max(wave_mod))]
-        error_data_c = error_data[(wave_data > np.min(wave_mod)) &
-            (wave_data < np.max(wave_mod))]
-        wave_data = wave_data_c
-        flux_data = flux_data_c 
-        error_data = error_data_c
-        
+        # Points to be added: continuum at 1.0 at arbitrary wavelengths.
+        # Store values in array to be concatenated 
+        wave_ext1 = np.array([min(wave_data) - 10.])   
+        wave_ext2 = np.array([max(wave_data) + 10.])   
+        cont_ext = np.array([1.0])
+        # Add the points to the existing arrays
+        wave_mod = np.concatenate((wave_ext1, wave_mod))
+        wave_mod = np.concatenate((wave_mod, wave_ext2))
+        flux_mod_orig = np.concatenate((cont_ext, flux_mod_orig))
+        flux_mod_orig = np.concatenate((flux_mod_orig, cont_ext))
+
     flux_mod = interp_modflux(wave_data, wave_mod, flux_mod_orig)
 
     chi2_line = np.sum(((flux_data - flux_mod) / (error_data))**2)
@@ -750,6 +845,11 @@ def clean_run(moddir, modname, savedir, outflag):
     os.system('cp ' + moddir + 'INDAT.DAT ' + mod_outdir + 'INDAT.DAT')
     os.system('cp ' + moddir + 'broad.in ' + mod_outdir + 'broad.in')
     os.system('cp ' + moddir + 'formal.in ' + mod_outdir + 'formal.in')
+
+    # Compress saved dir to tar.gz file and remove the directory
+    tarfilename = gendir + modname + '.tar.gz'
+    os.system('tar -czf ' + tarfilename + ' -C ' + mod_outdir + ' .')
+    os.system('rm -r ' + mod_outdir)
 
     # Remove all the files from 'run'
     rmdircommand = 'rm -r ' + moddir[:-8]

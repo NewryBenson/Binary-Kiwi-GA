@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=windtest4
+#SBATCH --job-name=H48_UVopt_a
 #SBATCH -t 120:00:00
-#SBATCH -n 120
+#SBATCH -n 192
 #SBATCH --no-requeue 
 
-runname=windtest4
+runname=H48_UVopt_a
 do_restart=no
-ncpu=120
+ncpu=192
 inidir=FW_inicalc
 
 echo Run ${runname}
@@ -51,4 +51,94 @@ else
 fi
 
 date
-echo ... Run ENDED! 
+echo ... Run ENDED!
+
+runname=H48_UVopt_b
+do_restart=no
+ncpu=192
+inidir=FW_inicalc
+
+echo Run ${runname}
+echo Using $ncpu CPUs
+echo Do restart? $do_restart
+
+# Define paths
+scratch=/scratch-shared/sbrands/${runname}/
+homedir=/home/sbrands/pyEA/
+
+echo Copying files
+
+# Create and copy directories and files
+mkdir -p $scratch
+cp -r ${homedir}*.py $scratch
+cp -r ${homedir}filter_transmissions $scratch
+mkdir -p ${scratch}input/
+mkdir -p ${scratch}input/${runname}/
+cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.
+cp -r ${homedir}${inidir} $scratch
+
+# Navigate to computation directory
+cd $scratch
+
+echo Starting run!
+date
+
+# Start run
+if [ "$do_restart" == "yes" ]
+then
+    echo ...restarting run
+    mpirun -n $ncpu python3 pyEA.py ${runname} -c
+else
+    echo ... creating output dir
+    mkdir -p output
+    echo ... starting run
+    mpirun -n $ncpu python3 pyEA.py ${runname}
+fi
+
+date
+echo ... Run ENDED
+
+runname=H48_UVopt_c
+do_restart=no
+ncpu=192
+inidir=FW_inicalc
+
+echo Run ${runname}
+echo Using $ncpu CPUs
+echo Do restart? $do_restart
+
+# Define paths
+scratch=/scratch-shared/sbrands/${runname}/
+homedir=/home/sbrands/pyEA/
+
+echo Copying files
+
+# Create and copy directories and files
+mkdir -p $scratch
+cp -r ${homedir}*.py $scratch
+cp -r ${homedir}filter_transmissions $scratch
+mkdir -p ${scratch}input/
+mkdir -p ${scratch}input/${runname}/
+cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.
+cp -r ${homedir}${inidir} $scratch
+
+# Navigate to computation directory
+cd $scratch
+
+echo Starting run!
+date
+
+# Start run
+if [ "$do_restart" == "yes" ]
+then
+    echo ...restarting run
+    mpirun -n $ncpu python3 pyEA.py ${runname} -c
+else
+    echo ... creating output dir
+    mkdir -p output
+    echo ... starting run
+    mpirun -n $ncpu python3 pyEA.py ${runname}
+fi
+
+date
+echo ... Run ENDED!! 

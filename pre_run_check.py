@@ -77,6 +77,13 @@ if test_inidir not in next(os.walk('.'))[1]:
         "' not found. Aborting pre_run_check.")
     sys.exit()
 
+# Check n_ind
+n_cpu_core = 24.0
+if (ctrldct["nind"]+1)/n_cpu_core % 1.0  > 0.0:
+    print("ERROR! Not using all " + str(n_cpu_core) + " cpu's per" 
+        " core")
+    sys.exit()
+
 # Check mutation rate parameters
 printsection('Mutation rate')
 checkdict["Mutation"] = True
@@ -153,8 +160,18 @@ if len(p_line_names) != len(np.unique(p_line_names)):
         print('  - ' + dup)
     checkdict["Parameter space"] = False
 if 'fic' not in param_names:
-    tparams = ''
-    tlen = 0
+    if 'fic' in fixed_names:
+        for i in range(len(fixed_names)):
+            if fixed_names[i] == 'fic':
+                if fixed_pars[i] == -1:
+                    tparams = ''
+                    tlen = 0
+                else:
+                    tparams = ''
+                    tlen = -10
+    else:
+        tparams = ''
+        tlen = 0
     for aparam in param_names:
         if aparam in ('vclstart', 'vclmax', 'fvel'):
             tparams = tparams + '"' + aparam + '" ' 
@@ -166,6 +183,7 @@ if 'fic' not in param_names:
     if tlen > 0:
         print('ERROR: no thick clumping, but ' + tparams + ' varied!')
         checkdict["Parameter space"] = False
+            
 if checkdict["Parameter space"] == True:
     print('\nParameter space ok.')
 

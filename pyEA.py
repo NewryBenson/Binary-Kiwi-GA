@@ -182,6 +182,12 @@ while gencount <= cdict["ngen"]:
     parallelout = list(pool.map(eval_fitness, names_genes))
     fitmeasures_o, red_chi2s_o = np.transpose(parallelout)
 
+    # # With higher mutation rates, ignore the elitist scheme. This 
+    # # might improve the chances of getting out of a local minimum. 
+    # if mutation_rate > cdict["pure_reinsert_min"]:
+    #     cdict["ratio_po"] == 1.0
+    #     cdict["f_parent"] == 0.0
+
     # The parent population (generation, fitmeasures), is created 
     # based on the offpsring pop. (generation_o, fitmeasures_o)
     if cdict["ratio_po"] == 1.0 and cdict["f_parent"] == 0.0:
