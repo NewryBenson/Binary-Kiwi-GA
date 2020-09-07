@@ -111,7 +111,7 @@ def get_defvals(the_filename, freenames, fixednames):
 
     return defnames, defvals
 
-def add2indat(list, dct, values, element=''):
+def add2indat(alist, dct, values, element=''):
     """Given a listof parameters (strings), create a line for
     the fastwind INDAT.DAT file.
 
@@ -134,9 +134,9 @@ def add2indat(list, dct, values, element=''):
             line = element + ' ' + dct[values[0]]
 
     line = line + '\n'
-    list.append(line)
+    alist.append(line)
 
-    return list
+    return alist
 
 def create_dict(freevals, freenames, fixvals, fixnames, defvals, defnames):
     """Store all parameters, free, fixed and defaults, in a
@@ -330,7 +330,6 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
 
     Furthermore, input files for pformal and broaden.py are created.
 
-    #FIXME X-rays are missing (FW syntax unknown, see below)
     """
 
     # Load all parameters in a dictionary
@@ -383,15 +382,12 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     add2indat(inl, dct, ['Mg'], 'MG')
     add2indat(inl, dct, ['P'], 'P')
 
-    # **********************************************************
-    # #FIXME: X-rays could be added here, but I don't know the
-    # exact syntax for that in FW. Should be tested first.
-    # In principle "adding X-rays to GA" should boil down to
-    #   -  Add the indat part here (with some if-statement)
-    #   -  Put the indat parameters to the defaults_fastwind.txt
-    #      so that you don't get an error if you don't specify
-    #      the X-ray parameters in the param_space.txt file
-    # **********************************************************
+    # Include X-rays if the volume filling fraction fx > 0.0
+    # (fx = 0 means no volume filled with X-rays, so exclude X-rays)
+    print("fxxxx = " + dct['fx'])
+    if float(dct['fx']) > 0.0:    
+        inl.append('XRAYS ' + dct['fx'] + '\n')
+        add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx'])
 
     # Write indat file
     with open(moddir + indat_file, 'w') as f:
@@ -413,6 +409,8 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     with open(moddir + broad_in, 'w') as f:
         f.write(dct['vrot'] + '\n')
         f.write(dct['macro'] + '\n')
+
+    return dct['radius']
 
 def check_parameters():
     """ Placeholder
@@ -789,7 +787,7 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot,
         linenames, fitnesses_lines)
 
-def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname):
+def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad):
     """ Write the paramters and fitness of an individual to the
     chi2-textfile.
     """
@@ -803,6 +801,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname):
         hstring = '#run_id gen chi2 rchi2 dof fitness maxit maxcorr cputime '
         for pname in paramnames:
             hstring = hstring + pname + ' '
+        hstring = hstring + 'radius '
         for linenm in linenames:
             hstring = hstring + linenm + ' '
         hstring = hstring + '\n'
@@ -815,6 +814,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname):
     istr = modname + ' ' + gen + ' ' + fitstr + metastr
     for param in genes:
         istr = istr + str(param) + ' '
+    istr = istr + str(rad) + ' '
     for lfit in linefitns:
         istr = istr + str(lfit) + ' '
     istr = istr + '\n'
@@ -845,7 +845,7 @@ def clean_run(moddir, modname, savedir, outflag):
     os.system('cp ' + moddir + 'INDAT.DAT ' + mod_outdir + 'INDAT.DAT')
     os.system('cp ' + moddir + 'broad.in ' + mod_outdir + 'broad.in')
     os.system('cp ' + moddir + 'formal.in ' + mod_outdir + 'formal.in')
-
+    
     # Compress saved dir to tar.gz file and remove the directory
     tarfilename = gendir + modname + '.tar.gz'
     os.system('tar -czf ' + tarfilename + ' -C ' + mod_outdir + ' .')
@@ -920,7 +920,7 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     mname, genes = name_n_genes
 
     moddir = init_mod_dir(inicalcdir, rundir, mname)
-    create_indat(genes, mname, moddir, *all_pars)
+    radius = create_indat(genes, mname, moddir, *all_pars)
     out = run_fw(modelatom, moddir, mname, fw_timeout, lineinfo)
 
     if out == 0:
@@ -930,7 +930,7 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
 
     runinfo = get_runinfo(moddir)
     clean_run(moddir, mname, savedir, out)
-    store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname)
+    store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname, radius)
 
     return fitinfo[0], fitinfo[3]
 

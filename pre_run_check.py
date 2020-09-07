@@ -33,6 +33,11 @@ merged_report = inputdir + "pre_run_report.pdf"
 
 report = inputdir + "pre_run_report.txt"
 
+if not os.path.isdir(inputdir):
+    print("Could not find direcotry " + inputdir)
+    print("    Typos happen to the best")
+    sys.exit()
+
 def print_write(the_string, the_file):
     with open(the_file, "a") as text_file:
         text_file.write(the_string + '\n')
@@ -83,6 +88,9 @@ if (ctrldct["nind"]+1)/n_cpu_core % 1.0  > 0.0:
     print("ERROR! Not using all " + str(n_cpu_core) + " cpu's per" 
         " core")
     sys.exit()
+
+print("\nnind = " + str(ctrldct["nind"]))
+print("ngen = " + str(ctrldct["ngen"]))
 
 # Check mutation rate parameters
 printsection('Mutation rate')
@@ -144,6 +152,48 @@ if 'vturb' in param_names or 'vturb' in fixed_names or 'vturb' in defnames:
         "micro turbulence), 'macro' (for macro turbulence) or \n  'windturb'" +
         " (for wind turbulence)")
 
+
+printsection("X-rays")
+
+all_names = np.concatenate((np.concatenate((param_names,fixed_names)),defnames))
+nonfree_names = np.concatenate((fixed_names,defnames))
+nonfree_vals = np.concatenate((fixed_pars,defvals))
+allp_dict = dict(zip(nonfree_names, nonfree_vals))
+
+if not 'fx' in all_names:
+    checkdict["Parameter space"] = False 
+    print("ERROR! X-rays nowhere specified. Add to params or defaults file")
+else:
+    need_xraydetails = False
+    if 'fx' in param_names:
+        need_xraydetails = True
+        print("X-rays included")
+        print("   - fx is a free parameter")
+    elif float(allp_dict['fx']) > 0.0:
+        need_xraydetails = True
+        print("X-rays included")
+        print("   - fx is fixed at " + allp_dict['fx'])
+    
+    if need_xraydetails:   
+        if not ('gamx' in all_names and 'Rinx' in all_names and 'mx' in all_names 
+            and 'uinfx' in all_names):
+            checkdict["Parameter space"] = False
+            print("ERROR: One or more X-ray parameters are missing")
+        else:
+            print("Other parameters:")
+            for apar in ('uinfx', 'mx', 'gamx', 'Rinx'):
+                if apar in param_names:
+                    print("   - " + apar + " is a free parameter")
+                else:
+                    print("   - " + apar + " = " + allp_dict[apar])
+    else:
+        print("X-rays not included")
+        for apar in ('uinfx', 'mx', 'gamx', 'Rinx'):
+            if apar in param_names:
+                checkdict["Parameter space"] = False
+                print("ERROR: " + apar + " is a free parameteter but " + 
+                    "fx is 0.0!") 
+ 
 p_line_names = []
 for aline in plines:
     if not aline.startswith('#'):

@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=H48_UVopt_a
+#SBATCH --job-name=H35_UVtest_0_null
 #SBATCH -t 120:00:00
-#SBATCH -n 192
+#SBATCH -N 8
+#SBACTH -n 192
 #SBATCH --no-requeue 
 
-runname=H48_UVopt_a
+runname=H35_UVtest_0_null
 do_restart=no
 ncpu=192
 inidir=FW_inicalc
@@ -42,103 +43,13 @@ date
 if [ "$do_restart" == "yes" ] 
 then
     echo ...restarting run
-    mpirun -n $ncpu python3 pyEA.py ${runname} -c
+    srun -n $ncpu python3 pyEA.py ${runname} -c
 else
     echo ... creating output dir
     mkdir -p output
     echo ... starting run 
-    mpirun -n $ncpu python3 pyEA.py ${runname}
+    srun -n $ncpu python3 pyEA.py ${runname}
 fi
 
 date
 echo ... Run ENDED!
-
-runname=H48_UVopt_b
-do_restart=no
-ncpu=192
-inidir=FW_inicalc
-
-echo Run ${runname}
-echo Using $ncpu CPUs
-echo Do restart? $do_restart
-
-# Define paths
-scratch=/scratch-shared/sbrands/${runname}/
-homedir=/home/sbrands/pyEA/
-
-echo Copying files
-
-# Create and copy directories and files
-mkdir -p $scratch
-cp -r ${homedir}*.py $scratch
-cp -r ${homedir}filter_transmissions $scratch
-mkdir -p ${scratch}input/
-mkdir -p ${scratch}input/${runname}/
-cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.
-cp -r ${homedir}${inidir} $scratch
-
-# Navigate to computation directory
-cd $scratch
-
-echo Starting run!
-date
-
-# Start run
-if [ "$do_restart" == "yes" ]
-then
-    echo ...restarting run
-    mpirun -n $ncpu python3 pyEA.py ${runname} -c
-else
-    echo ... creating output dir
-    mkdir -p output
-    echo ... starting run
-    mpirun -n $ncpu python3 pyEA.py ${runname}
-fi
-
-date
-echo ... Run ENDED
-
-runname=H48_UVopt_c
-do_restart=no
-ncpu=192
-inidir=FW_inicalc
-
-echo Run ${runname}
-echo Using $ncpu CPUs
-echo Do restart? $do_restart
-
-# Define paths
-scratch=/scratch-shared/sbrands/${runname}/
-homedir=/home/sbrands/pyEA/
-
-echo Copying files
-
-# Create and copy directories and files
-mkdir -p $scratch
-cp -r ${homedir}*.py $scratch
-cp -r ${homedir}filter_transmissions $scratch
-mkdir -p ${scratch}input/
-mkdir -p ${scratch}input/${runname}/
-cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.
-cp -r ${homedir}${inidir} $scratch
-
-# Navigate to computation directory
-cd $scratch
-
-echo Starting run!
-date
-
-# Start run
-if [ "$do_restart" == "yes" ]
-then
-    echo ...restarting run
-    mpirun -n $ncpu python3 pyEA.py ${runname} -c
-else
-    echo ... creating output dir
-    mkdir -p output
-    echo ... starting run
-    mpirun -n $ncpu python3 pyEA.py ${runname}
-fi
-
-date
-echo ... Run ENDED!! 
