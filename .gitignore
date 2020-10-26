@@ -14,3 +14,4 @@ slurm-*out
 *.job
 example_input2/*
 test_scripts/*
+*.job_backup
