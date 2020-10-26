@@ -1,3 +1,10 @@
+# Sarah Brands s.a.brands@uva.nl
+# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# This is the main script for the python Evolutionary Algorithm. 
+# It prepares the MPI, reads input files, then either initiates a 
+# run or restarts one. The bulk of the computation is then done by
+# iterating through x generations. 
+
 import __future__
 import os
 import sys
@@ -39,11 +46,10 @@ if not fw.check_indir(inputdir):
     sys.exit()
 
 # Initial setup of directories and file paths
-# If you want to make a subdirectory, you have to take this 
-# into account when going back to the main directory after 
+# Note that if you want to make a subdirectory, you have to take 
+# this into account when going back to the main directory after 
 # fastwind has run (in the function execute_fastwind)
 outputdir = paths.outputdir
-#outputdir = paths.outputdir + args.runname + '/'
 fd = fw.make_file_dict(inputdir, outputdir)
 fw.mkdir(paths.outputdir)
 fw.mkdir(outputdir)
@@ -115,8 +121,11 @@ if not args.c:
         cdict["be_verbose"])
 
     mutation_rate = cdict["mut_rate_init"] # initial mutation rate
+    gen_variety = pop.assess_variation(generation, param_space, genbest)
 
     pop.store_mutation(fd["mutation_out"], mutation_rate, gencount)
+    pop.store_charbonneaulimits(fd["charblim_out"], cdict, gencount)
+    pop.store_genvar(fd["genvar_out"], gencount, gen_variety, fitmeasures)
     os.system('cp ' + fd["chi2_out"] + ' ' + fd["chi2_cont"])
     os.system('cp ' + fd["dupl_out"] + ' ' + fd["dupl_cont"]) 
     np.savetxt(fd["gen_cont"], generation)
@@ -140,7 +149,7 @@ while gencount <= cdict["ngen"]:
     # !!! The control file is read from *input_copy* directory, 
     #     so changing values in the input directory has no effect !
     cdict = fw.read_control_pars(fd["control_in"])
-   
+  
     if gencount > cdict["ngen"]:
         break
  
@@ -151,23 +160,6 @@ while gencount <= cdict["ngen"]:
         rundir, savedir, all_pars, cdict["modelatom"], cdict["fw_timeout"],
         lineinfo, dof, cdict["fitmeasure"], fd["chi2_out"], param_names)
     
-    gen_variety = pop.assess_variation(generation, param_space, genbest)
-    mean_gen_variety = np.mean(gen_variety)
-
-    # Depending on the scheme chosen, adjust the mutation rate.
-    # If the chosen scheme is 'constant', no adaption is made. 
-    if cdict["mut_adjust_type"] == 'carbonneau':
-        mutation_rate = pop.adjust_mutation_rate_carbonneau(mutation_rate,
-            fitmeasures, cdict["mut_rate_factor"], cdict["mut_rate_min"],
-            cdict["mut_rate_max"], cdict["fit_cutoff_min_carb"],
-            cdict["fit_cutoff_min_carb"])
-    
-    elif cdict["mut_adjust_type"] == 'genvariety':
-        mutation_rate = pop.adjust_mutation_genvariety(mutation_rate,
-            cdict["cutoff_decrease_genv"], cdict["cutoff_increase_genv"],
-            cdict["mut_rate_factor"], cdict["mut_rate_min"],
-            cdict["mut_rate_max"], mean_gen_variety, param_space)
-
     # Reproduce and asses fitness
     generation_o = pop.reproduce(generation, fitmeasures, mutation_rate,
         cdict["clone_fraction"], param_space, fd["dupl_out"],
@@ -181,12 +173,6 @@ while gencount <= cdict["ngen"]:
         names_genes.append([mname, gene])
     parallelout = list(pool.map(eval_fitness, names_genes))
     fitmeasures_o, red_chi2s_o = np.transpose(parallelout)
-
-    # # With higher mutation rates, ignore the elitist scheme. This 
-    # # might improve the chances of getting out of a local minimum. 
-    # if mutation_rate > cdict["pure_reinsert_min"]:
-    #     cdict["ratio_po"] == 1.0
-    #     cdict["f_parent"] == 0.0
 
     # The parent population (generation, fitmeasures), is created 
     # based on the offpsring pop. (generation_o, fitmeasures_o)
@@ -212,21 +198,45 @@ while gencount <= cdict["ngen"]:
     
     genbest, best_fitness = pop.get_fittest(generation, fitmeasures)
     best_rchi2 = np.min(red_chi2s)
+
+    gen_variety = pop.assess_variation(generation, param_space, genbest)
+    mean_gen_variety = np.mean(gen_variety)
+    pop.store_genvar(fd["genvar_out"], gencount, gen_variety, fitmeasures)
     pop.store_lowestchi2(fd["bestchi2_out"], best_rchi2, gencount)
 
-    pop.store_genvar(fd["genvar_out"], gencount, gen_variety, fitmeasures)
-    pop.print_report(gencount, best_fitness, np.median(fitmeasures),
-        cdict["be_verbose"])
+    # Before adjusting the mutation rate, set the charbonneau limits, 
+    # if 'autocharb' is chosen. This is done every generation so that you
+    # can change the mutation type during the run, if wanted. 
+    if cdict['mut_adjust_type'] == 'autocharb':
+        cdict = pop.autoadjust_charbonneau(cdict, fd, gencount)
+ 
+    # Depending on the scheme chosen, adjust the mutation rate.
+    # If the chosen scheme is 'constant', no adaption is made. 
+    if cdict["mut_adjust_type"] in ('charbonneau', 'autocharb'):
+        mutation_rate = pop.adjust_mutation_rate_charbonneau(mutation_rate,
+            fitmeasures, cdict["mut_rate_factor"], cdict["mut_rate_min"],
+            cdict["mut_rate_max"], cdict["fit_cutoff_min_charb"],
+            cdict["fit_cutoff_min_charb"])
+    
+    elif cdict["mut_adjust_type"] == 'genvariety':
+        mutation_rate = pop.adjust_mutation_genvariety(mutation_rate,
+            cdict["cutoff_decrease_genv"], cdict["cutoff_increase_genv"],
+            cdict["mut_rate_factor"], cdict["mut_rate_min"],
+            cdict["mut_rate_max"], mean_gen_variety, param_space)
 
     # Store mutation rate and files for run continuation
     # Copies of the chi2 file and dupl file are certain to only 
     # contain the output of a fully completed generation. 
     pop.store_mutation(fd["mutation_out"], mutation_rate, gencount)
+    pop.store_charbonneaulimits(fd["charblim_out"], cdict, gencount)
     os.system('cp ' + fd["chi2_out"] + ' ' + fd["chi2_cont"])
     os.system('cp ' + fd["dupl_out"] + ' ' + fd["dupl_cont"]) 
     np.savetxt(fd["gen_cont"], generation)
     np.savetxt(fd["fit_cont"], fitmeasures)
     np.savetxt(fd["redchi_cont"], red_chi2s)
+
+    pop.print_report(gencount, best_fitness, np.median(fitmeasures),
+        cdict["be_verbose"])
 
 pool.close()
 

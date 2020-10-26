@@ -1,3 +1,10 @@
+# Sarah Brands s.a.brands@uva.nl
+# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# This script contains functions for controlling the evolutionary 
+# algorithm, i.e. population control: reproduction, mutation rate etc.
+# For using the algorithm this has to be combined with a wrapper for 
+# the model/function to be optimised.
+
 import os
 import random
 import numpy as np
@@ -52,14 +59,14 @@ def store_models(duplfile, individual):
         for aline in write_lines:
             the_file.write(aline)
 
-def carbonneau_ratio(the_fitn):
+def charbonneau_ratio(the_fitn):
     """ Measure for the fitness spread of the population"""
     best_mod = np.min(the_fitn)
     median_mod = np.median(the_fitn)
     
-    carbratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
+    charbratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
 
-    return best_mod, median_mod, carbratio
+    return best_mod, median_mod, charbratio
 
 def store_lowestchi2(txtfile, lowestchi2, gcount):
     """ Write the paramters and fitness of each individual in the
@@ -99,22 +106,42 @@ def store_mutation(txtfile, mutrate, gcount):
         for aline in write_lines:
             the_file.write(aline)
 
+def store_charbonneaulimits(txtfile, thedct, gcount):
+    """ Write the charbonneau limits used for adapting the mutation
+    rate of the current generation into a textfile.
+    """
+    write_lines = []
+
+    if not os.path.isfile(txtfile):
+        headerstring = '#Generation charblim_min charblim_max \n'
+        write_lines.append(headerstring)
+
+    charbmin = thedct["fit_cutoff_min_charb"]
+    charbmax = thedct["fit_cutoff_max_charb"]
+
+    carline = str(gcount) + ' ' + str(charbmin) + ' ' + str(charbmax) + '\n'
+    write_lines.append(carline)
+
+    with open(txtfile, 'a') as the_file:
+        for aline in write_lines:
+            the_file.write(aline)
+
 def store_genvar(txtfile, gcount, genvar, fitnesses):
-    """ Write the genetic variety and carbonneau ratio of the current 
+    """ Write the genetic variety and charbonneau ratio of the current 
     genertaion into a textfile.
     """
     write_lines = []
 
     if not os.path.isfile(txtfile):
-        headerstring = ('#Generation median_genvariety carbonneau_ratio '
+        headerstring = ('#Generation median_genvariety charbonneau_ratio '
                         'median_fitness best_fitness \n')
         write_lines.append(headerstring)
 
-    cbest, cmed, cratio = carbonneau_ratio(fitnesses) 
-    carbstring = str(cratio) + ' ' + str(cmed) + ' ' + str(cbest)
+    cbest, cmed, cratio = charbonneau_ratio(fitnesses) 
+    charbstring = str(cratio) + ' ' + str(cmed) + ' ' + str(cbest)
 
     med_genvar = str(np.median(genvar))
-    genvarline = str(gcount) + ' ' + med_genvar + ' ' + carbstring + '\n'
+    genvarline = str(gcount) + ' ' + med_genvar + ' ' + charbstring + '\n'
     write_lines.append(genvarline)
 
     with open(txtfile, 'a') as the_file:
@@ -425,11 +452,11 @@ def get_top_x_fittest(population, chi_pop, topx):
 
     return best_population, best_chi2s
 
-def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
+def adjust_mutation_rate_charbonneau(old_rate, chi2, mut_rate_factor,
     mut_rate_min, mut_rate_max, fit_cutoff_min, fit_cutoff_max):
     """Adjust the mutation rate based on the typical fitness
     in a population of individuals, as is suggested in
-    Carbonneau."""
+    Charbonneau (1995)"""
 
     # A large ratio means that the difference between the 'typical
     # model' in a generation, and the fittest model is large. In this
@@ -440,7 +467,7 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
     # mutation rate is then increased so that less well explored parts
     # of the parameter space will be probed.
 
-    cbest, cmod, ratio = carbonneau_ratio(chi2) 
+    cbest, cmod, ratio = charbonneau_ratio(chi2) 
 
     if ratio <= fit_cutoff_min:
         new_rate = min(mut_rate_max, old_rate*mut_rate_factor)
@@ -451,10 +478,74 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
 
     return new_rate
 
+def auto_charbonneau_limits(dct, charbini):
+    ''' Given the initial Charbonneau ratio of the run, compute
+        reasonable values for the final Charbonnau ratio '''
+
+    ac_fit_a = float(dct['ac_fit_a'])
+    ac_fit_b = float(dct['ac_fit_b'])
+    ac_lowerlim = float(dct['ac_lowerlim'])
+    ac_upperlim = float(dct['ac_upperlim'])
+    ac_max_factor = float(dct['ac_max_factor'])
+    
+    charblim_min = ac_fit_a + charbini*ac_fit_b
+
+    if charblim_min < ac_lowerlim:
+        charblim_min = ac_lowerlim
+    elif charblim_min > ac_upperlim:
+        charblim_min = ac_upperlim
+
+    charblim_max = ac_max_factor*charblim_min
+
+    charblim_min = round(charblim_min,3)
+    charblim_max = round(charblim_max,3)
+
+    dct['fit_cutoff_min_charb'] = charblim_min
+    dct['fit_cutoff_max_charb'] = charblim_max
+
+    return dct
+
+def autoadjust_charbonneau(dct_ctrl, dct_files, gencount):
+    ''' This function adjusts the charbonneau limits (so overrides
+    the ones given in the control file) after the first generation
+    by using the charbonneau ratio of the first generation as an 
+    indication for reasonable limits. This is because while ideally 
+    the ratio reflects only the convergence of the run, in practice
+    it also depends on the spectrum that you fit. This has to be 
+    taken into account when using the limits. 
+    If after ac_maxgen generations the charbonneau lower limit is 
+    still not reached, then automatically increase mutation rate. 
+    '''
+    with open(dct_files["genvar_out"]) as f:
+        content = f.readlines()
+
+    charbini_run = float(content[1].strip().split()[2])
+
+    dct_ctrl = auto_charbonneau_limits(dct_ctrl, charbini_run)
+
+    if gencount > float(dct_ctrl['ac_maxgen']):
+        charb_list = np.genfromtxt(dct_files["genvar_out"]).T[2]
+        min_charb_run = np.min(charb_list)
+        last_charb_run = charb_list[-1]
+
+        if min_charb_run > float(dct_ctrl['fit_cutoff_min_charb']):
+            dct_ctrl['fit_cutoff_min_charb'] = round(last_charb_run +
+                float(dct_ctrl['ac_maxgen_min']),3)
+            dct_ctrl['fit_cutoff_max_charb'] = round(last_charb_run +
+                float(dct_ctrl['ac_maxgen_max']),3)
+
+    return dct_ctrl
+
 def assess_variation(fullgeneration, paramspace, fittest_ind):
     """Look at how many 'steps' each parameter differs from the
     best fitting model. This is a measure for genetic variety
-    of the generation """
+    of the generation
+
+    ***** Function no longer in use *****
+    The problem with this method was that the genetic variety is depending 
+    strongly on the stepsize that you allow for the different parameters. 
+    There are solutions to this, but they are not implemented. 
+    """    
 
     fullgeneration = np.array(fullgeneration)
     fittest_ind = np.array(fittest_ind)
@@ -468,7 +559,13 @@ def assess_variation(fullgeneration, paramspace, fittest_ind):
 def adjust_mutation_genvariety(mutrate, cutdecr, cutincr, mutfactor,
     mutmin, mutmax, mean_gen_var, parspace):
     """ Adjust the mutation rate, depending on genetic genetic
-    variety of the generation."""
+    variety of the generation.
+    
+    ***** Function no longer in use *****
+    The problem with this method was that the genetic variety is depending 
+    strongly on the stepsize that you allow for the different parameters. 
+    There are solutions to this, but they are not implemented. 
+    """
 
     if mean_gen_var > cutdecr *len(parspace):
         mutrate = mutrate/mutfactor

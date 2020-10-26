@@ -1,3 +1,8 @@
+# Sarah Brands s.a.brands@uva.nl
+# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# Connects the evolutionary algorithm to the FASTWIND stellar atmosphere
+# code, i.e. manages and creates FASTWIND input and output
+
 import os
 import sys
 import numpy as np
@@ -75,8 +80,8 @@ def read_control_pars(control_source):
     ctrldct["mut_rate_max"] = float(ctrldct["mut_rate_max"])
     ctrldct["mut_rate_factor"] = float(ctrldct["mut_rate_factor"])
     ctrldct["pure_reinsert_min"] = float(ctrldct["pure_reinsert_min"])
-    ctrldct["fit_cutoff_min_carb"] = float(ctrldct["fit_cutoff_min_carb"])
-    ctrldct["fit_cutoff_max_carb"] = float(ctrldct["fit_cutoff_max_carb"])
+    ctrldct["fit_cutoff_min_charb"] = float(ctrldct["fit_cutoff_min_charb"])
+    ctrldct["fit_cutoff_max_charb"] = float(ctrldct["fit_cutoff_max_charb"])
     ctrldct["cutoff_increase_genv"] = float(ctrldct["cutoff_increase_genv"])
     ctrldct["cutoff_decrease_genv"] = float(ctrldct["cutoff_decrease_genv"])
     
@@ -167,9 +172,9 @@ def get_radius(dct, radinfo):
     return dct
 
 def get_vinf(dct):
-    """If the vinf is not a fixed or free, adapt a value of
-    x times the escape velocity. Otherwise leave unchanged.
-    #FIXME #HIGHPRIORITY
+    """If the vinf is not a fixed or free (i.e. if its value is set
+    at vinf = -1 in the input, then adapt a value of x times the escape 
+    velocity where x depends on temperature. Otherwise leave unchanged.
     """
 
     logg = float(dct['logg'])
@@ -200,23 +205,29 @@ def get_vinf(dct):
     return dct
 
 def convert_vclmax_scale(vclstart, vclextend):
-
+    """ If vclmax is a free parameter, then in case that it is 
+    lower than vstart, get another vclmax value by scaling vclstart
+    """
     maxrange = 1.0 - vclstart
     vclmax = vclstart + (vclextend * maxrange)
-
     vclmax = str(round(vclmax,4))
 
     return vclmax
 
 def convert_vclmax_multi(vclstart, vclextend, factor):
-    
+    """ If vclmax is a free parameter, then in case that it is 
+    lower than vstart, get another vclmax value by multiplying vclstart
+    """
     vclmax = min(round(factor * vclstart, 4), 1.0)
     vclmax = str(vclmax)
 
     return vclmax
 
 def convert_vclmax_add(vclstart, vclextend, addition):
-    
+    """ If vclmax is a free parameter, then in case that it is 
+    lower than vstart, get another vclmax value by adding a value 
+    to vclstart.
+    """
     vclmax = min(round(vclstart + addition, 4), 1.0)
     vclmax = str(vclmax)
 
@@ -234,6 +245,8 @@ def get_vclmax(dct):
 
     if vclmax == -1.0:
         dct['vclmax'] = convert_vclmax_multi(vclstart, vclmax, 2.0)
+
+    # Varying vclmax is somewhat experimental
     elif vclmax >= 0.0 and vclmax <= 1.0:
         if vclmax < vclstart:
             # If vclmax is too low (i.e. lower than vclstart), the value
@@ -250,7 +263,7 @@ def get_vclmax(dct):
             # closer to random. 
 
         else:
-            # If it isn't smaller than vclstart, then  vclmax is kept 
+            # If it isn't smaller than vclstart, then vclmax is kept 
             # to the value picked originally by GA
             pass
 
@@ -335,12 +348,13 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     # Load all parameters in a dictionary
     dct = create_dict(freevals, freenames, fixvals, fixnames,
             defvals, defnames)
-    dct = get_radius(dct, radinfo)
     # For approximating vinf with the vesc we need the correct
     # value for the radius to be already present in the dct.
+    dct = get_radius(dct, radinfo)
     dct = get_vinf(dct)
     dct = calculate_mdot(dct)
 
+    # Optically thin or optically thick clumping?
     clumptype = clumping_type(dct['fic'])
 
     # If vclmax = -1, get a value based on vclstart
@@ -412,20 +426,6 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
 
     return dct['radius']
 
-def check_parameters():
-    """ Placeholder
-    #FIXME! do some basic parameter checks on the input before the run
-    starts. Ideally this is part of the "submission to cluster" script,
-    so that you don't waste time if there is an error in your input.
-    Check in param_file.txt:
-    - step size: should be always greater than zero if a param is free.
-    - check for duplicates in param_space file
-    - if fic != -1, then are all clumping values specified outside default?
-    - check whether all lines in line_info are in FORMAL_INPUT.
-    - check that the reinsertion scheme is ok 
-    - check whether the narrow_step_size width is ok
-    """
-
 def read_linelist(theflinelist):
     """Read the line_list file and output numpy arrays"""
     llist_names = np.genfromtxt(theflinelist, dtype='str').T[0]
@@ -433,6 +433,9 @@ def read_linelist(theflinelist):
     return llist_names, llist_params
 
 def parallelcrop(list1, list2, list3, start_list1, stop_list1):
+    """ Based on values in list1, crop the same arguments of 
+    list2 and 3. Used for cropping spectra based on wavelength
+    boundaries. """
 
     minarg = np.argmax(list1>start_list1)
     maxarg = np.argmax(list1>stop_list1)
@@ -527,9 +530,10 @@ def execute_fastwind(atom, fwtimeout, moddir):
     pnlte_eo = './pnlte_' + atom + '.eo '
     timeout = 'timeout ' + fwtimeout + ' '
     # ----------------------------------------------------
-    # #FIXME This is a workaround for testing on OS X,
+    # This is a workaround for testing on OS X,
     # where the timeout command is not available, only
-    # gtimeout is. Can be removed when using on linux
+    # gtimeout is. Can be removed when using on linux 
+    # but is in principle harmless 
     if sys.platform == "darwin":
         timeout = 'gtimeout ' + fwtimeout + ' '
     # ----------------------------------------------------
@@ -545,6 +549,8 @@ def execute_fastwind(atom, fwtimeout, moddir):
     os.system(do_pformal)
 
     # Return to the main directory
+    # This is a weak point: if paths are changed 
+    # elsewhere then we run into errors here. #FIXME
     os.chdir('../../../../')
 
 def read_fwline(OUT_file):
@@ -954,6 +960,7 @@ def make_file_dict(indir, outdir):
     chi2file = 'chi2.txt'
     duplfile = 'check_duplicates.txt'
     mutationfile = 'mutation_by_gen.txt'
+    charblimfile = 'charbonneau_limits.txt'
     bestchi2file = 'best_chi2.txt'
     paramspacefile_out = 'parameter_space.txt'
     genvarfile_out = 'genetic_variety.txt'
@@ -978,6 +985,7 @@ def make_file_dict(indir, outdir):
     dct = add_to_dict(dct, "chi2_out", outdir + chi2file)
     dct = add_to_dict(dct, "dupl_out", outdir + duplfile)
     dct = add_to_dict(dct, "mutation_out", outdir + mutationfile)
+    dct = add_to_dict(dct, "charblim_out", outdir + charblimfile)
     dct = add_to_dict(dct, "bestchi2_out", outdir + bestchi2file)
     dct = add_to_dict(dct, "paramspace_out", outdir + paramspacefile_out)
     dct = add_to_dict(dct, "genvar_out", outdir + genvarfile_out)

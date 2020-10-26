@@ -1,6 +1,18 @@
 # Sarah Brands s.a.brands@uva.nl 25-02-2020
 # Script with some basic checks on pyEA input.
-# To be run before starting a run, argument: runname
+#
+# Should be executed before starting a run:
+#  - Checks several aspects of the run setup
+#      * Prints report where errors are pointed out
+#      * Plots spectrum, line boundaries and parameter space
+#        (saved to pdf in input directory of the run)
+#  - Creates a job file
+#
+# Usage: 
+#   python pre_run_check.py <runname>
+# Or if you want to both print and save the output of the script:
+#   python pre_run_check.py <runname> | tee -a "input/<runname>/prerun.log"
+# Saves log into run input directory (also the pdf report goes here).
 
 import os
 import sys 
@@ -12,9 +24,18 @@ from PyPDF2 import PdfFileMerger
 import fastwind_wrapper as fw
 import population as pop
 
+jobscriptfile = 'run_pyEA.job'
+
 run_name = sys.argv[1]
 if run_name.endswith('/'):
     run_name = run_name[:-1]
+if len(sys.argv) > 2:
+    if sys.argv[2] == 'restart':
+        do_restart='yes'
+    else:
+        do_restart='no'
+else:
+    do_restart='no'
 
 inputmain = 'input/'
 inputdir = inputmain + run_name + '/'
@@ -95,6 +116,13 @@ print("ngen = " + str(ctrldct["ngen"]))
 # Check mutation rate parameters
 printsection('Mutation rate')
 checkdict["Mutation"] = True
+mut_adjust_type = ctrldct["mut_adjust_type"]
+if not mut_adjust_type in ('contstant', 'charbonneau', 'autocharb'):
+    print('ERROR: mut_adjust_type unknown: ' + mut_adjust_type)
+    checkdict["Mutation"] = False
+
+fit_cutoff_min_charb = ctrldct["fit_cutoff_min_charb"]
+fit_cutoff_max_charb = ctrldct["fit_cutoff_max_charb"]
 w_gauss_na = ctrldct['w_gauss_na']
 w_gauss_br = ctrldct['w_gauss_br']
 b_gauss_na = ctrldct['b_gauss_na']
@@ -132,6 +160,26 @@ if b_gauss_na != 0.0:
     checkdict["Mutation"] = False
 if checkdict["Mutation"] == True:
     print('No suspicious things found in mutation parameters.')
+
+mut_adj_type = ctrldct["mut_adjust_type"]
+if mut_adj_type == 'autocharb':
+    printsection('Auto adaption charbonneau limits')
+    ac_fit_a = ctrldct["ac_fit_a"]
+    ac_fit_b = ctrldct["ac_fit_b"]
+    ac_max_factor = ctrldct["ac_max_factor"]
+    ac_maxgen = ctrldct["ac_maxgen"]
+    ac_maxgen_min = ctrldct["ac_maxgen_min"]
+    ac_maxgen_max = ctrldct["ac_maxgen_max"]
+    ac_lowerlim = ctrldct["ac_lowerlim"]
+    ac_upperlim = ctrldct["ac_upperlim"]
+    print('ac_fit_a        ' + ac_fit_a)
+    print('ac_fit_b        ' + ac_fit_b)
+    print('ac_max_factor   ' + ac_max_factor)
+    print('ac_maxgen       ' + ac_maxgen)
+    print('ac_maxgen_min   ' + ac_maxgen_min)
+    print('ac_maxgen_max   ' + ac_maxgen_max)
+    print('ac_lowerlim     ' + ac_lowerlim)
+    print('ac_upperlim     ' + ac_upperlim)
 
 # Checks on parameter space
 printsection('Parameter space')
@@ -476,4 +524,72 @@ merger.close()
 for pdf in pdfs:
     os.system("rm " + pdf)
 
+jobscriptlines = ['#!/bin/bash',
+'#SBATCH --job-name=' + run_name,
+'#SBATCH -t 120:00:00',
+'#SBATCH -N ' + str(int((ctrldct["nind"]+1)/n_cpu_core)),
+'#SBACTH -n ' + str(ctrldct["nind"]+1),
+'#SBATCH --no-requeue',
+'',
+'runname=' + run_name,
+'do_restart=' + do_restart,
+'ncpu=' + str(ctrldct["nind"]+1),
+'inidir=FW_inicalc',
+'',
+'echo Run ${runname}',
+'echo Using $ncpu CPUs',
+'echo Do restart? $do_restart',
+'',
+'# Load modules',
+'module load 2019',
+'module load Python/3.6.6-intel-2018b',
+'',
+'# Define paths',
+'scratch=/scratch-shared/sbrands/${runname}/',
+'homedir=/home/sbrands/pyEA/',
+'',
+'echo Copying files',
+'',
+'# Create and copy directories and files',
+'mkdir -p $scratch',
+'cp -r ${homedir}*.py $scratch',
+'cp -r ${homedir}filter_transmissions $scratch',
+'mkdir -p ${scratch}input/',
+'mkdir -p ${scratch}input/${runname}/',
+'cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.',
+'cp -r ${homedir}${inidir} $scratch',
+'',
+'# Navigate to computation directory',
+'cd $scratch',
+'',
+'echo Starting run!',
+'date',
+'',
+'# Start run',
+'if [ "$do_restart" == "yes" ]',
+'then',
+'    echo ...restarting run',
+'    srun -n $ncpu python3 pyEA.py ${runname} -c',
+'else',
+'    echo ... creating output dir',
+'    mkdir -p output',
+'    echo ... starting run',
+'    srun -n $ncpu python3 pyEA.py ${runname}',
+'fi',
+'',
+'date',
+'echo ... Run ENDED!']
+
+with open(jobscriptfile,'w') as f:
+    for aline in jobscriptlines:
+        f.write(aline + '\n')
+
+if do_restart == 'no':
+    print('\nCreated ' + jobscriptfile + ' --- NO restart')
+if do_restart == 'yes':
+    print('\nCreated ' + jobscriptfile + ' --- WITH RESTART!')
 print('\nEnd of pre-run check.')
+
+
+
+

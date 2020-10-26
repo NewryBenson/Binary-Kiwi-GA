@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=H35_UVtest_0_null
+#SBATCH --job-name=test
 #SBATCH -t 120:00:00
 #SBATCH -N 8
 #SBACTH -n 192
-#SBATCH --no-requeue 
+#SBATCH --no-requeue
 
-runname=H35_UVtest_0_null
+runname=test
 do_restart=no
 ncpu=192
 inidir=FW_inicalc
@@ -25,7 +25,7 @@ homedir=/home/sbrands/pyEA/
 echo Copying files
 
 # Create and copy directories and files
-mkdir -p $scratch 
+mkdir -p $scratch
 cp -r ${homedir}*.py $scratch
 cp -r ${homedir}filter_transmissions $scratch
 mkdir -p ${scratch}input/
@@ -33,21 +33,21 @@ mkdir -p ${scratch}input/${runname}/
 cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.
 cp -r ${homedir}${inidir} $scratch
 
-# Navigate to computation directory 
-cd $scratch 
+# Navigate to computation directory
+cd $scratch
 
 echo Starting run!
-date 
+date
 
 # Start run
-if [ "$do_restart" == "yes" ] 
+if [ "$do_restart" == "yes" ]
 then
     echo ...restarting run
     srun -n $ncpu python3 pyEA.py ${runname} -c
 else
     echo ... creating output dir
     mkdir -p output
-    echo ... starting run 
+    echo ... starting run
     srun -n $ncpu python3 pyEA.py ${runname}
 fi
 

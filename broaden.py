@@ -1,6 +1,6 @@
 """
-Routine to apply instumental, rotational, and macroturbulent broadening
-for the GA.
+Routine to apply instumental, rotational, and macroturbulent broadening.
+Script from  Michael Abdul Masih
 Usage:
 > python broaden.py -f <filename> -r <resolving power> -v <vrot> -m <vmacro>
 Needs PyAstronomy on Lisa, to install this:
@@ -17,16 +17,16 @@ import sys
 import argparse
 import numpy as np
 from math import sin, pi
-from scipy.interpolate import interp1d                      # Interpolation routine
-from scipy.special import erf                               # Error function
-from scipy.signal import fftconvolve                        # Convolution routine
-from PyAstronomy.pyasl import rotBroad, instrBroadGaussFast # Rotational and instumental broadening routines
+from scipy.interpolate import interp1d 
+from scipy.special import erf 
+from scipy.signal import fftconvolve
+from PyAstronomy.pyasl import rotBroad, instrBroadGaussFast
 
 # Settings & constants
-binSize = 0.01     # Size of wavelength bins to resample input spectrum to
-finalBins = 0.01   # Size of wavelength bins of output spectrum after broadening
-limbDark = 0.6     # Limb darkening coefficient to be used by rotational broadening
-c = 299792.458     # Speed of light in km/s
+binSize = 0.01    # Size of wavelength bins resampled spectrum (Angstrom)
+finalBins = 0.01  # Size of wavelength bins of broadened spectrum (Angstrom)
+limbDark = 0.6    # Limb darkening coefficient (rotational broadening)
+c = 299792.458    # Speed of light in km/s
 
 
 def main():
@@ -38,12 +38,13 @@ def main():
     except IOError as ioe:
         print(ioe, "Input spectrum " + arguments.fileName + " not found!")
         sys.exit()
-    # Resample the input spectrum to even wavelength bins of <binSize> Angstrom
+    # Resample input spectrum to even wavelength bins of <binSize> Angstrom
     newWlc = np.arange(wlc[0]+binSize, wlc[-1]-binSize, binSize)
     flux = np.interp(newWlc, wlc, flux)
     wlc = newWlc
     # Apply instrumental broadening
-    flux = instrBroadGaussFast(wlc, flux, arguments.res, maxsig=5.0, edgeHandling="firstlast")
+    flux = instrBroadGaussFast(wlc, flux, arguments.res, maxsig=5.0, 
+        edgeHandling="firstlast")
     # Apply rotational broadening
     flux = rotBroad(wlc, flux, limbDark, arguments.vrot)
     # Apply macroturbulent broadening
