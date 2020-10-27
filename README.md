@@ -1,6 +1,16 @@
 # pyEA
 Genetic/Evolutionary Algorithm in python for fitting Fastwind models
 
+A detailed description of the code will follow in Brands in prep.: 
+"The R136 star cluster dissected with Hubble Space Telescope/STIS. 
+  The wind properties of the most massive stars in the core of R136"
+
+The code contains elements of the Pikaia algorithm of Charbonneau+ 1995, 
+but in the basis is different. In practice, exploration is faster because
+we employ a different way of mutation, amongst several other changes. 
+The original method of Carbonneau, using parameters that are decoded in 
+strings, is also implemented, but not extensively tested. 
+
 == Very brief instructions for usage ==
 
 Directory FW_inicalc:
@@ -27,12 +37,3 @@ Running pyEA:
 - After the run, you can run python GA_Analysis.py --> the version on 
   here now is old and will probably not work with current output, this 
   will be updated the coming days. 
-
-A more detailed description of the code will follow in Brands in prep.: 
-"The R136 star cluster dissected with Hubble Space Telescope/STIS. 
-  The wind properties of the most massive stars in the core of R136"
-
-The code contains elements of the Pikaia algorithm of Charbonneau+ 1995, 
-but in the basis is different. In practice, exploration is faster when 
-employing a different way of mutation. The original method (parameters 
-are decoded in strings) is also implemented, but not tested. 
