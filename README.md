@@ -14,9 +14,10 @@ strings, is also implemented, but not extensively tested.
 == Very brief instructions for usage ==
 
 Directory FW_inicalc:
-- Tested with FASTWIND version: V10.3.1dev (not in repository). 
-- Compile FW elsewhere, then copy everything in the inicalc directory 
+- In the main directory, make a directory called FW_inicalc 
+- Compile FASTWIND elsewhere, then copy everything in the inicalc directory 
    to FW_inicalc in the folder pyEA.
+- Tested with FASTWIND version: V10.3.1dev (not in repository).
 
 Running pyEA:
 - The input should be put in a directory 'input/runname/' 
