@@ -8,7 +8,7 @@ A detailed description of the code will follow in Brands in prep.:
 The code contains elements of the Pikaia algorithm of Charbonneau+ 1995, 
 but in the basis is different. In practice, exploration is faster because
 we employ a different way of mutation, amongst several other changes. 
-The original method of Carbonneau, using parameters that are decoded in 
+The original method of Charbonneau, using parameters that are decoded in 
 strings, is also implemented, but not extensively tested. 
 
 == Very brief instructions for usage ==
