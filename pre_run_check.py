@@ -158,6 +158,18 @@ if b_gauss_na != 0.0:
     print('  This means it will cause mutations far away from current value.')
     print('   - Narrow gauss base : ' + str(b_gauss_br))
     checkdict["Mutation"] = False
+
+if ctrldct["use_string"] in ('yes', 'y', 'True', True):
+    checkdict["Mutation"] = False
+    print('WARNING: using Charbonneau scheme with strings. '
+       'This will make the run slower')
+    if int(ctrldct["sigs_string"]) != 2:
+        print('WARNING: significant digits different than in pyGA')
+    if (float(ctrldct["fracdouble_string"]) < 0.0 or 
+            float(ctrldct["fracdouble_string"]) > 1.0):
+        print('WARNING: fracdouble_string should have a value 0 <= value <= 1.0, ' 
+            '\n current value is ' + str(ctrldct["fracdouble_string"]))
+
 if checkdict["Mutation"] == True:
     print('No suspicious things found in mutation parameters.')
 
@@ -413,8 +425,9 @@ for i in range(ncols*nrows):
 
     for vline in vlines:
         ax[crow,ccol].axvline(vline, lw=1.0, alpha=0.5)
-    ax[crow,ccol].plot(xgauss, na_gauss, 'red', lw=2)
-    ax[crow,ccol].plot(xgauss, br_gauss, 'orange', lw=2)
+    if ctrldct['use_string'] not in ('y', 'yes', 'True', True):
+        ax[crow,ccol].plot(xgauss, na_gauss, 'red', lw=2)
+        ax[crow,ccol].plot(xgauss, br_gauss, 'orange', lw=2)
     ax[crow,ccol].set_xlim(start-3*step, stop+3*step)
     ax[crow,ccol].set_title(param_names[i])
     ax[crow,ccol].set_yticks([])

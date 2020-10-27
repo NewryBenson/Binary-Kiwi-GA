@@ -8,6 +8,7 @@
 import os
 import random
 import numpy as np
+import string
 
 import subprocess
 import time
@@ -303,9 +304,110 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
 
     return mutated_genes
 
+def genes2str(the_genes, the_pars, add_sig):
+
+    genestring = ''
+    for i in range(len(the_pars)):
+        # Read input from parameter space
+        pstart = the_pars[i][0]
+        pstop = the_pars[i][1]
+        pstep = the_pars[i][2]
+
+        # Assess significant digits.
+        sig_digits = np.ceil(np.log10(abs(float(pstop) - (float(pstart)))) -
+            np.floor(np.log10(float(pstep))))
+        sig_digits = int(sig_digits) + add_sig
+
+        # Convert parameter value to string value
+        gstr = str(int((np.abs(the_genes[i] - pstart)/np.abs(pstop - pstart))*(10**sig_digits - 1))).zfill(sig_digits)
+
+        # Append to gene string of this individual
+        genestring = genestring + gstr
+
+    return genestring
+
+def str2genes(the_str, the_pars, add_sig):
+
+    the_genes = []
+
+    for i in range(len(the_pars)):
+
+        # Read input from parameter space
+        pstart = the_pars[i][0]
+        pstop = the_pars[i][1]
+        pstep = the_pars[i][2]
+        pround = the_pars[i][3]
+
+        # Assess significant digits.
+        sig_digits = np.ceil(np.log10(abs(float(pstop) - (float(pstart)))) -
+            np.floor(np.log10(float(pstep))))
+        sig_digits = int(sig_digits) + add_sig
+
+        # Crop the relevant number of digits from the string
+        print('the_str (i=' + str(i) + ')' , the_str)
+        print('sig_digits ' , sig_digits)
+        par_string = the_str[:sig_digits]
+        the_str = the_str[sig_digits:]
+
+        # Convert to parameter value and round acc to stepsize in input
+        real_val = (float(par_string)/(10**sig_digits - 1))*np.abs(pstop -
+            pstart) + pstart
+        paramarray = np.arange(pstart, pstop, pstep)
+        round_real = find_nearest(paramarray, real_val)
+        round_real = round(round_real, int(pround))
+
+        # Append to array of parameters for this individual
+        the_genes.append(round_real)
+
+    return the_genes
+
+def crossover_strings(mother_str, father_str, clonefrac, pfrac):
+
+    strlen = len(mother_str)
+
+    if random.random() < clonefrac:
+        babygirl = mother_str
+        babyboy = father_str
+    else:
+        if random.random() > pfrac:
+            cutidx = np.random.choice(strlen)
+            babygirl = mother_str[:cutidx] + father_str[cutidx:]
+            babyboy = father_str[:cutidx] + mother_str[cutidx:]
+        else:
+            randidx1, randidx2 =  np.random.choice(strlen, 2, replace=False)
+            cutidx1 = min(randidx1, randidx2)
+            cutidx2 = max(randidx1, randidx2)
+            babygirl = (mother_str[:cutidx1] + father_str[cutidx1:cutidx2] + 
+                mother_str[cutidx2:])
+            babyboy = (father_str[:cutidx1] + mother_str[cutidx1:cutidx2] + 
+                father_str[cutidx2:])
+    return babygirl, babyboy
+
+def mutation_random_string(gene_string, mutrate):
+
+    strlen = len(gene_string)
+    mutidx = np.where(np.random.random(strlen) < mutrate)[0]
+    split_genestring = np.array(list(gene_string))
+    split_genestring[mutidx] = np.random.choice(10, len(mutidx)).astype(str)
+    mutated_genestring = ''.join(str(x) for x in split_genestring)
+
+    return mutated_genestring
+
+def mutation_creep_string(gene_string, mutrate):
+
+    strlen = len(gene_string)
+    mutidx = np.where(np.random.random(strlen) < mutrate)[0]
+    split_genestring = np.array(list(gene_string))
+    creep = (split_genestring[mutidx].astype(int) + 
+        np.random.choice([-1, 1], len(mutidx))) % 10
+    split_genestring[mutidx] = creep.astype(str)
+    mutated_genestring = ''.join(str(x) for x in split_genestring)
+
+    return mutated_genestring
+
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, mut_rate_na,
-    n_ind, na_type, br_type, dgauss):
+    n_ind, na_type, br_type, dgauss, use_string, add_sigs, frac_double):
     """Given a population of individuals and a measure for their
     fitness, generate a new generation of individuals.
 
@@ -320,6 +422,9 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     approach that uses the fitness directly for weight, it will.
 
     """
+
+    add_sigs = int(add_sigs)
+    frac_double = float(frac_double)
 
     # Rank the individuals according to their fitness
     order = np.argsort(fitm)
@@ -341,31 +446,55 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         mother_genes = pop_orig[mother_idx]
         father_genes = pop_orig[father_idx]
 
-        # Parent genomes produce two baby genomes
-        baby_genes1, baby_genes2 = crossover(mother_genes, father_genes,
-            clone_fraction)
+        # Option to use crossover and reproduction as in Charbonneau+95,
+        # Using strings of numbers representing the parameters.
+        if use_string in ('yes', 'y', 'Yes', 'True', True):
+            # Convert genes to strings
+            mother_str = genes2str(mother_genes, paramspace, add_sigs)
+            father_str = genes2str(father_genes, paramspace, add_sigs)
 
-        # Mutate the baby genomes. There are two modes of mutation.
-        # Load values defining the distributions for the two types. 
-        gauss_w_na = float(gauss_w_na)
-        gauss_w_br = float(gauss_w_br)
-        gauss_b_na = float(gauss_b_na)
-        gauss_b_br = float(gauss_b_br)
-        mut_rate_na = float(mut_rate_na)
+            # Parent genomes produce two baby genomes
+            baby_genes1, baby_genes2 = crossover_strings(mother_str, father_str,
+                clone_fraction, frac_double)
+            
+            # Mutation
+            baby_genes1 = mutation_random_string(baby_genes1, mutation_rate)
+            baby_genes2 = mutation_random_string(baby_genes2, mutation_rate)
 
-        # Narrow mutation: close to original value, high mutation
-        # rate that is in principle fixed 
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
-            mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
-            mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
-        
-        # Broad mutation: further away from original value, lower 
-        # mutation rate that is variable
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
-            mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
-            mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
+            baby_genes1 = mutation_creep_string(baby_genes1, mutation_rate)
+            baby_genes2 = mutation_creep_string(baby_genes2, mutation_rate)
+
+            # Convert strings back to genes
+            baby_genes1 = str2genes(baby_genes1, paramspace, add_sigs)
+            baby_genes2 = str2genes(baby_genes2, paramspace, add_sigs)
+
+        # Recombination and mutation as described in Brands+in prep.
+        else:
+            # Parent genomes produce two baby genomes
+            baby_genes1, baby_genes2 = crossover(mother_genes, father_genes,
+                clone_fraction)
+
+            # Mutate the baby genomes. There are two modes of mutation.
+            # Load values defining the distributions for the two types.
+            gauss_w_na = float(gauss_w_na)
+            gauss_w_br = float(gauss_w_br)
+            gauss_b_na = float(gauss_b_na)
+            gauss_b_br = float(gauss_b_br)
+            mut_rate_na = float(mut_rate_na)
+
+            # Narrow mutation: close to original value, high mutation
+            # rate that is in principle fixed
+            baby_genes1 = gaussian_mutation(baby_genes1, paramspace,
+                mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
+            baby_genes2 = gaussian_mutation(baby_genes2, paramspace,
+                mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
+
+            # Broad mutation: further away from original value, lower
+            # mutation rate that is variable
+            baby_genes1 = gaussian_mutation(baby_genes1, paramspace,
+                mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
+            baby_genes2 = gaussian_mutation(baby_genes2, paramspace,
+                mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
         if not dup_tf:
@@ -387,9 +516,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         else:
             dupcount = dupcount + 1
 
-    be_verbose = False
-    if be_verbose:
-        print("DUPLICATE COUNT GEN: " + str(dupcount))
+    print("DUPLICATE COUNT GEN: " + str(dupcount))
 
     return pop_new
 

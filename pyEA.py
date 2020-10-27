@@ -165,7 +165,9 @@ while gencount <= cdict["ngen"]:
         cdict["clone_fraction"], param_space, fd["dupl_out"],
         cdict["w_gauss_na"], cdict["w_gauss_br"], cdict["b_gauss_na"],
         cdict["b_gauss_br"], cdict["mut_rate_na"], cdict["nind"],
-        cdict["narrow_type"], cdict["broad_type"], cdict["doublebroad"])
+        cdict["narrow_type"], cdict["broad_type"], cdict["doublebroad"],
+        cdict["use_string"], cdict["sigs_string"], 
+        cdict["fracdouble_string"])
     modnames = fw.gen_modnames(gencount, cdict["nind"])
 
     names_genes = []

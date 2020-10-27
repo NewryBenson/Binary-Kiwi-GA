@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=test
-#SBATCH -t 120:00:00
-#SBATCH -N 8
-#SBACTH -n 192
+#SBATCH --job-name=sim_H52_SNR30
+#SBATCH -t 040:00:00
+#SBATCH -N 1
+#SBACTH -n 72
 #SBATCH --no-requeue
 
-runname=test
+runname=sim_H52_SNR30
 do_restart=no
-ncpu=192
+ncpu=72
 inidir=FW_inicalc
 
 echo Run ${runname}
