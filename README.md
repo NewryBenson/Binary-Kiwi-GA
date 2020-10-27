@@ -20,10 +20,13 @@ Running pyEA:
   start the run prevents the run goes bad by silly mistakes in the input 
   files (visually check the output pdf!).
 - The pre_run_check also generates a job script, but you should tailor 
-this ot the cluster on which you are running the code. A jobscript for 
-cartesius.surfsara can be found in the main directory. 
+  this ot the cluster on which you are running the code. A jobscript for 
+  cartesius.surfsara can be found in the main directory. 
 - The only "input" that should be set in the job script rather than one 
-of the input files, is whether you start a new run, or restart an old one. 
+  of the input files, is whether you start a new run, or restart an old one. 
+- After the run, you can run python GA_Analysis.py --> the version on 
+  here now is old and will probably not work with current output, this 
+  will be updated the coming days. 
 
 A more detailed description of the code will follow in Brands in prep.: 
 "The R136 star cluster dissected with Hubble Space Telescope/STIS. 
