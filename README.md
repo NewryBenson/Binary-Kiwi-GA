@@ -33,4 +33,6 @@ A more detailed description of the code will follow in Brands in prep.:
   The wind properties of the most massive stars in the core of R136"
 
 The code contains elements of the Pikaia algorithm of Charbonneau+ 1995, 
-but in the basis is different.
+but in the basis is different. In practice, exploration is faster when 
+employing a different way of mutation. The original method (parameters 
+are decoded in strings) is also implemented, but not tested. 
