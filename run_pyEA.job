@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=sim_H52_SNR30
-#SBATCH -t 040:00:00
-#SBATCH -N 1
-#SBACTH -n 72
+#SBATCH --job-name=R136a3_UVopt_2102b
+#SBATCH -t 50:00:00
+#SBATCH -N 10
+#SBACTH -n 240
 #SBATCH --no-requeue
 
-runname=sim_H52_SNR30
+runname=R136a3_UVopt_2102b
 do_restart=no
-ncpu=72
+ncpu=240
 inidir=FW_inicalc
 
 echo Run ${runname}
@@ -20,7 +20,7 @@ module load Python/3.6.6-intel-2018b
 
 # Define paths
 scratch=/scratch-shared/sbrands/${runname}/
-homedir=/home/sbrands/pyEA/
+homedir=/home/USERNAME/pyEA/
 
 echo Copying files
 

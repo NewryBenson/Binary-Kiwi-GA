@@ -320,6 +320,31 @@ def calculate_mdot(dct, significant_digits=6):
 
     return dct
 
+def get_fx(dct):
+    """ Estimates fx based on the Mdot and vinf, based on the
+    power law of Kudritzki, Palsa, Feldmeier et al. (1996). This power law
+    is extrapolated also outside where Kudritzki+96 have data points.
+
+    Input:
+        - Dictionary with parameter values in the form of strings
+    Output:
+        - Dictionary with parameter values, updated with fx
+    """
+
+    mdot = float(dct['mdot'])
+    vinf = float(dct['vinf'])
+
+    mdot = mdot / 10**(-6)
+    logmdotvinf = np.log10(mdot/vinf)
+
+    # Relation from Kudritzki, Palsa, Feldmeier et al. (1996)
+    logfx = -5.45 - 1.05*logmdotvinf
+    fx = round(10**(logfx),8)
+
+    dct['fx'] = str(fx)
+
+    return dct
+
 def clumping_type(ficval):
     """
     Determine the type of clumping. If 'fic' is specified, this
@@ -365,6 +390,10 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     # Creating lines to write to the inifile here.
     inl = ["'" + modname + "'\n"]
 
+    # If logfclump < 3., use logfclump instead of fclump
+    if float(dct['logfclump']) <= np.log10(1000.0):
+        dct['fclump'] = str(round(10**(float(dct['logfclump'])),7))
+
     # Stuff needed in every FW model.
     add2indat(inl, dct, ['optne_update', 'he_one', 'it_start', 'itmore'])
     add2indat(inl, dct, ['optmixed'])
@@ -398,8 +427,18 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
 
     # Include X-rays if the volume filling fraction fx > 0.0
     # (fx = 0 means no volume filled with X-rays, so exclude X-rays)
-    print("fxxxx = " + dct['fx'])
-    if float(dct['fx']) > 0.0:    
+    # When fx > 1000, estimate it based on mdot and vinf:
+    if float(dct['fx']) > 1000:
+        dct = get_fx(dct)
+        print('fx estimated = ' + dct['fx'])
+    # Use logscale fx value if that is in a valid range 
+    #  (only when it has set to such value in defaults, or in para-
+    #  meter space, it will)
+    if float(dct['logfx']) <= np.log10(16.0):
+        dct['fx'] = str(round(10**(float(dct['logfx'])),7))
+    # Add X-rays if the volume filling fraction > 0 *and* if teff is high
+    # enough X-rays are in FW not allowed for Teff<25000 (model will crash)
+    if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):    
         inl.append('XRAYS ' + dct['fx'] + '\n')
         add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx'])
 
@@ -680,11 +719,14 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     # part of the data when fitting). 
 
     if min(wave_data) < min(wave_mod) or max(wave_data) > max(wave_mod):
-        # Points to be added: continuum at 1.0 at arbitrary wavelengths.
-        # Store values in array to be concatenated 
-        wave_ext1 = np.array([min(wave_data) - 10.])   
-        wave_ext2 = np.array([max(wave_data) + 10.])   
-        cont_ext = np.array([1.0])
+        # Points to be added: continuum at 1.0 at both sides
+        # Store values in array to be concatenated
+        delta_wave = wave_mod[1] - wave_mod[0]
+        addwave_left = wave_mod[0] - delta_wave
+        addwave_right =  wave_mod[-1] + delta_wave
+        wave_ext1 = np.array([min(wave_mod) - 90., addwave_left])   
+        wave_ext2 = np.array([addwave_right, max(wave_mod) + 90.])   
+        cont_ext = np.array([1.0, 1.0])
         # Add the points to the existing arrays
         wave_mod = np.concatenate((wave_ext1, wave_mod))
         wave_mod = np.concatenate((wave_mod, wave_ext2))
@@ -793,7 +835,8 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot,
         linenames, fitnesses_lines)
 
-def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad):
+def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad, 
+        xlum):
     """ Write the paramters and fitness of an individual to the
     chi2-textfile.
     """
@@ -808,6 +851,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad):
         for pname in paramnames:
             hstring = hstring + pname + ' '
         hstring = hstring + 'radius '
+        hstring = hstring + 'xlum '
         for linenm in linenames:
             hstring = hstring + linenm + ' '
         hstring = hstring + '\n'
@@ -821,6 +865,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad):
     for param in genes:
         istr = istr + str(param) + ' '
     istr = istr + str(rad) + ' '
+    istr = istr + str(xlum) + ' ' 
     for lfit in linefitns:
         istr = istr + str(lfit) + ' '
     istr = istr + '\n'
@@ -909,6 +954,27 @@ def get_runinfo(moddir):
 
     return [maxcor, maxit, cputime]
 
+def get_xlum_out(moddir, mname):
+    """ Get the X-ray luminosity from the FW output
+        Input: path to model directory (string)
+        Output: Lx/L (string)
+    """
+
+    xlumitfile = moddir + mname + '/XLUM_ITERATION'
+
+    if os.path.isfile(xlumitfile):
+        with open(xlumitfile) as f:
+            content = f.readlines()
+            if len(content) > 0:
+                xlumline = content[-1].strip().split()
+                xlum = str(xlumline[2])
+            else:
+                xlum = '-1'
+    else:
+        xlum = '-1'
+
+    return xlum
+
 def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     fw_timeout, lineinfo, dof, fitmeasure, chi2file, paramnames, name_n_genes):
     """Evaluate the fitness of an individual. This step is
@@ -935,8 +1001,10 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
         fitinfo = assess_fitness(moddir, mname, lineinfo, dof, fitmeasure)
 
     runinfo = get_runinfo(moddir)
+    xlum = get_xlum_out(moddir, mname)
     clean_run(moddir, mname, savedir, out)
-    store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname, radius)
+    store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname, 
+        radius, xlum)
 
     return fitinfo[0], fitinfo[3]
 

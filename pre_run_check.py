@@ -25,6 +25,7 @@ import fastwind_wrapper as fw
 import population as pop
 
 jobscriptfile = 'run_pyEA.job'
+hours_str = '50' # wall time 
 
 run_name = sys.argv[1]
 if run_name.endswith('/'):
@@ -170,6 +171,12 @@ if ctrldct["use_string"] in ('yes', 'y', 'True', True):
         print('WARNING: fracdouble_string should have a value 0 <= value <= 1.0, ' 
             '\n current value is ' + str(ctrldct["fracdouble_string"]))
 
+if not abs(float(ctrldct["mut_rate_max"]) - 1./len(param_names)) < 0.001:
+    print("1/nfree =! mut_rate_max")
+    print("   - 1/nfree      = "+ str(round(1./len(param_names),3)))
+    print("   - mut_rate_max = " + str(ctrldct["mut_rate_max"]))
+    checkdict["Mutation"] = False
+
 if checkdict["Mutation"] == True:
     print('No suspicious things found in mutation parameters.')
 
@@ -194,6 +201,12 @@ if mut_adj_type == 'autocharb':
     print('ac_upperlim     ' + ac_upperlim)
 
 # Checks on parameter space
+
+all_names = np.concatenate((np.concatenate((param_names,fixed_names)),defnames))
+nonfree_names = np.concatenate((fixed_names,defnames))
+nonfree_vals = np.concatenate((fixed_pars,defvals))
+allp_dict = dict(zip(nonfree_names, nonfree_vals))
+
 printsection('Parameter space')
 print('Number of free parameters: ' + str(len(param_names)))
 for pn in param_names:
@@ -206,35 +219,102 @@ for fp, fv in zip(fixed_names, fixed_pars):
 with open(paramspacename) as f:
     plines = f.readlines()
 
+if 'vinf' in param_names:
+    for iii in range(len(param_names)):
+        if param_names[iii] == 'vinf':
+            vinfidx = iii
+    if float(param_space[vinfidx][0]) == 0.0:
+        checkdict["Parameter space"] = False
+        print("ERROR: vinf cannot be 0.0!")
+    if float(param_space[vinfidx][1]) == 0.0:
+        checkdict["Parameter space"] = False
+        print("ERROR: vinf cannot be 0.0!")
+
 if 'vturb' in param_names or 'vturb' in fixed_names or 'vturb' in defnames:
     checkdict["Parameter space"] = False
     print("ERROR: 'vturb' is not a parameter, use instead: \n  'micro' (for " +
         "micro turbulence), 'macro' (for macro turbulence) or \n  'windturb'" +
         " (for wind turbulence)")
 
+print('')
+if 'fclump' in param_names and 'logfclump' in param_names:
+    checkdict["Parameter space"] = False 
+    print("ERROR: both fclump and logfclump are free parameters!")
+elif 'fclump' in param_names:
+    if float(allp_dict['logfclump']) < np.log10(1000.0):
+        checkdict["Parameter space"] = False
+        print("ERROR: fclump free, but logfclump set to < 3.0")
+    else:
+        print("Using 'fclump' as free clumping parameter")
+elif 'logfclump' in param_names:
+    print("Using 'logfclump' as free clumping parameter")
+    for thepname, i in zip(param_names, range(len(param_space))):
+        if thepname == 'logfclump':
+            if float(param_space[i][1]) > 2.0:
+                checkdict["Parameter space"] = False
+                print("logfclump (upper) = " + str(param_space[i][1]) + "!")
+                print("ERROR: fclump upper limit is very high!") 
+            if float(param_space[i][0]) < 0.0:
+                checkdict["Parameter space"] = False
+                print("logfclump (lower) = " + str(param_space[i][0]) + "!")
+                print("ERROR: fclump should never be lower than 1.0!")
+else:
+    print('No clumping fitted')
+    if 'logfclump' not in all_names:
+        print('ERROR: add "logfclump" to defaults_fastwind.txt !!')
+        checkdict["Parameter space"] = False
 
 printsection("X-rays")
 
-all_names = np.concatenate((np.concatenate((param_names,fixed_names)),defnames))
-nonfree_names = np.concatenate((fixed_names,defnames))
-nonfree_vals = np.concatenate((fixed_pars,defvals))
-allp_dict = dict(zip(nonfree_names, nonfree_vals))
-
-if not 'fx' in all_names:
+if not ('fx' in all_names and 'logfx' in all_names):
     checkdict["Parameter space"] = False 
-    print("ERROR! X-rays nowhere specified. Add to params or defaults file")
+    print("ERROR! X-rays not specified.")
+    if not 'fx' in all_names:
+        print("  --> fx missing")
+    else: 
+        print("  --> logfx missing")
+    print("Add to params or defaults file")
 else:
     need_xraydetails = False
     if 'fx' in param_names:
         need_xraydetails = True
         print("X-rays included")
         print("   - fx is a free parameter")
+        if ('logfx' not in param_names and 
+                float(allp_dict['logfx']) < np.log10(16.0)):
+            checkdict["Parameter space"] = False
+            print("ERROR --> logfx set to < 1.2 but not in use")
+    if 'logfx' in param_names:
+        need_xraydetails = True
+        print("X-rays included")
+        print("   - logfx is a free parameter")
+        if 'fx' not in param_names and float(allp_dict['fx']) > 0:
+            checkdict["Parameter space"] = False
+            print("ERROR --> fx set to > 0 but not in use")
     elif float(allp_dict['fx']) > 0.0:
         need_xraydetails = True
         print("X-rays included")
-        print("   - fx is fixed at " + allp_dict['fx'])
-    
+        if float(allp_dict['fx']) > 1000:
+            print("   - Estimating fx with Kudritzki 1996 law")
+        else:
+            print("   - fx is fixed at " + allp_dict['fx'])
     if need_xraydetails:   
+        if 'teff' not in param_names:
+            if float(allp_dict['teff']) < 25000.0:
+                print("ERROR: X-rays included but Teff fixed to < 25000")
+                checkdict["Parameter space"] = False
+        else:
+            for iii in range(len(param_names)):
+                if param_names[iii] == 'teff':
+                    teffidx = iii
+            if float(param_space[teffidx][1]) < 25000.0:
+                print("ERROR: X-rays included but full parameter space \n"+
+                      "will be treated without X-rays: all Teff < 25000")
+                checkdict["Parameter space"] = False
+            elif float(param_space[teffidx][0]) < 25000.0:
+                print("\n\nWARNING: X-rays included but part of parameter "+
+                      "space will be treated\nwithout X-rays: Teff range "+
+                      "covers Teff < 25000\n\n")
         if not ('gamx' in all_names and 'Rinx' in all_names and 'mx' in all_names 
             and 'uinfx' in all_names):
             checkdict["Parameter space"] = False
@@ -253,7 +333,24 @@ else:
                 checkdict["Parameter space"] = False
                 print("ERROR: " + apar + " is a free parameteter but " + 
                     "fx is 0.0!") 
- 
+    if 'fx' in param_names and 'logfx' in param_names:
+        checkdict["Parameter space"] = False
+        print("ERROR: both fx and logfx are free parameters")
+    elif 'fx' in param_names and allp_dict['logfx'] <= np.log(16.0):
+        checkdict["Parameter space"] = False
+        print("ERROR: fx is a free parameter, but logfx is in use")
+        print("   value of logfx = " + str(allp_dict['logfx']))
+    elif 'logfx' in param_names and float(allp_dict['fx']) > 1000.0:
+        checkdict["Parameter space"] = False
+        print("ERROR: logfx is a free parameter, but fx is set to be chosen ")
+        print("       according to the Kudritzki law (fx > 1000).")
+    elif 'logfx' in param_names:
+        for thepname, i in zip(param_names, range(len(param_space))):
+            if thepname == 'logfx':
+                if float(param_space[i][1]) >= np.log10(16.0):
+                    checkdict["Parameter space"] = False
+                    print("ERROR: please set logfx upperbound no larger than 1.2")
+
 p_line_names = []
 for aline in plines:
     if not aline.startswith('#'):
@@ -283,7 +380,8 @@ if 'fic' not in param_names:
         tparams = ''
         tlen = 0
     for aparam in param_names:
-        if aparam in ('vclstart', 'vclmax', 'fvel'):
+        #if aparam in ('vclstart', 'vclmax', 'fvel', 'h'):
+        if aparam in ('fvel', 'h'):
             tparams = tparams + '"' + aparam + '" ' 
             tlen = tlen + 1
     if tlen == 1:
@@ -293,7 +391,7 @@ if 'fic' not in param_names:
     if tlen > 0:
         print('ERROR: no thick clumping, but ' + tparams + ' varied!')
         checkdict["Parameter space"] = False
-            
+
 if checkdict["Parameter space"] == True:
     print('\nParameter space ok.')
 
@@ -303,30 +401,35 @@ printsection('Step sizes')
 checkdict['Step size'] = True
 for i in range(len(param_space)):
     stepsize = param_space[i][2]
-    pwidth = np.abs(param_space[i][1] - param_space[i][0])
-    if np.abs(pwidth/stepsize - np.round(pwidth/stepsize,0)) > 0.0001:
-        print('   - ' + param_names[i] + ': ERROR: step size cannot divide'
-            ' parameter range into equal parts')
-        print('     start: ' + str(param_space[i][0]) + ', stop: ' + 
-             str(param_space[i][1]) + ', step: ',  str(param_space[i][2]) )
-        print(np.abs(pwidth/stepsize))
-        print(int(pwidth/stepsize))
+    if stepsize > 0.0:
+        pwidth = np.abs(param_space[i][1] - param_space[i][0])
+        if np.abs(pwidth/stepsize - np.round(pwidth/stepsize,0)) > 0.0001:
+            print('   - ' + param_names[i] + ': ERROR: step size cannot divide'
+                ' parameter range into equal parts')
+            print('     start: ' + str(param_space[i][0]) + ', stop: ' + 
+                 str(param_space[i][1]) + ', step: ',  str(param_space[i][2]) )
+            print(np.abs(pwidth/stepsize))
+            print(int(pwidth/stepsize))
+            checkdict['Step size'] = False
+        stepfrac = 1.0*stepsize/pwidth
+        if stepsize < 0:
+            checkdict['Step size'] = False
+            print('  - ' + param_names[i] + ': ERROR: negative stepsize')
+        if stepsize == 0.0:
+            checkdict['Step size'] = False
+            print('  - ' + param_names[i] + ': ERROR: stepsize = 0.0')
+        if stepfrac*warning_na > w_gauss_na and type_na == 'frac':
+            print('  - ' + param_names[i] + ': WARNING: stepsize is large ' +
+                'compared to narrow mutation width')
+            print('    ' + 'ratio is ' + str(round(w_gauss_na/stepfrac,2)) +
+                 ' while it is preferrably ~>' + str(warning_na) +
+                 '\n    Current step size: ' + str(stepsize) + 
+                 '\n    --> consider to decrease step size or increase w_gauss_na')
+            checkdict['Step size'] = False
+    else:    
+        print("ERROR: stepsize must exceed 0.0")
         checkdict['Step size'] = False
-    stepfrac = 1.0*stepsize/pwidth
-    if stepsize < 0:
-        checkdict['Step size'] = False
-        print('  - ' + param_names[i] + ': ERROR: negative stepsize')
-    if stepsize == 0.0:
-        checkdict['Step size'] = False
-        print('  - ' + param_names[i] + ': ERROR: stepsize = 0.0')
-    if stepfrac*warning_na > w_gauss_na and type_na == 'frac':
-        print('  - ' + param_names[i] + ': WARNING: stepsize is large ' +
-            'compared to narrow mutation width')
-        print('    ' + 'ratio is ' + str(round(w_gauss_na/stepfrac,2)) +
-             ' while it is preferrably ~>' + str(warning_na) +
-             '\n    Current step size: ' + str(stepsize) + 
-             '\n    --> consider to decrease step size or increase w_gauss_na')
-        checkdict['Step size'] = False
+
 if checkdict['Step size'] == True:
     print('All stepsizes ok.')
          
@@ -369,6 +472,10 @@ for i in checkdict:
         printsumline(i, 'irregularities found --> CHECK INPUT!', nd)
 print("##" + (nd-4)*' ' + '##')
 print(nd*'#')
+
+if not checkdict['Step size']:
+    print("\nIrregularities found in stepsize: cannot make plots")
+    sys.exit()
 
 ###################################
 #        Plot param space         #
@@ -462,9 +569,17 @@ fig, ax = plt.subplots(nrows, ncols, figsize=(3*ncols, 3*nrows))
 
 extra_AA = 2.0
 specwave, specflux, specerr = np.genfromtxt(spectrumname).T
+if np.count_nonzero(np.isnan(specflux)) > 0:
+    print("ERROR! Spectrum contains one or more NaN values")
+    print("   At wavelengths:")
+    for nanwave in specwave[np.isnan(specflux)]:
+        print("    * " + str(round(nanwave,3)))
+    print("\n> Could not make plot for " + run_name + ", exiting...")
+    sys.exit()
 specmin, specmax = np.min(specflux), np.max(specflux)
 for i in range(ncols*nrows):
     if ccol == ncols - 1:
+
         ccol = 0
         crow = crow + 1
     else:
@@ -539,7 +654,7 @@ for pdf in pdfs:
 
 jobscriptlines = ['#!/bin/bash',
 '#SBATCH --job-name=' + run_name,
-'#SBATCH -t 120:00:00',
+'#SBATCH -t ' + hours_str + ':00:00',
 '#SBATCH -N ' + str(int((ctrldct["nind"]+1)/n_cpu_core)),
 '#SBACTH -n ' + str(ctrldct["nind"]+1),
 '#SBATCH --no-requeue',
@@ -547,7 +662,7 @@ jobscriptlines = ['#!/bin/bash',
 'runname=' + run_name,
 'do_restart=' + do_restart,
 'ncpu=' + str(ctrldct["nind"]+1),
-'inidir=FW_inicalc',
+'inidir=' + test_inidir[-1],
 '',
 'echo Run ${runname}',
 'echo Using $ncpu CPUs',
@@ -601,7 +716,7 @@ if do_restart == 'no':
     print('\nCreated ' + jobscriptfile + ' --- NO restart')
 if do_restart == 'yes':
     print('\nCreated ' + jobscriptfile + ' --- WITH RESTART!')
-print('\nEnd of pre-run check.')
+print('\nEnd of pre-run check of ' + run_name)
 
 
 
