@@ -4,6 +4,8 @@
 *.swp
 inicalc/*
 FW_inicalc/*
+v11_inicalc/*
+v10_inicalc/*
 output/*
 input/*
 old/*
