@@ -1,6 +1,14 @@
+# Sarah Brands s.a.brands@uva.nl
+# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# This script contains functions for controlling the evolutionary 
+# algorithm, i.e. population control: reproduction, mutation rate etc.
+# For using the algorithm this has to be combined with a wrapper for 
+# the model/function to be optimised.
+
 import os
 import random
 import numpy as np
+import string
 
 import subprocess
 import time
@@ -52,14 +60,14 @@ def store_models(duplfile, individual):
         for aline in write_lines:
             the_file.write(aline)
 
-def carbonneau_ratio(the_fitn):
+def charbonneau_ratio(the_fitn):
     """ Measure for the fitness spread of the population"""
     best_mod = np.min(the_fitn)
     median_mod = np.median(the_fitn)
     
-    carbratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
+    charbratio = np.abs(best_mod - median_mod) / (best_mod + median_mod)
 
-    return best_mod, median_mod, carbratio
+    return best_mod, median_mod, charbratio
 
 def store_lowestchi2(txtfile, lowestchi2, gcount):
     """ Write the paramters and fitness of each individual in the
@@ -99,22 +107,42 @@ def store_mutation(txtfile, mutrate, gcount):
         for aline in write_lines:
             the_file.write(aline)
 
+def store_charbonneaulimits(txtfile, thedct, gcount):
+    """ Write the charbonneau limits used for adapting the mutation
+    rate of the current generation into a textfile.
+    """
+    write_lines = []
+
+    if not os.path.isfile(txtfile):
+        headerstring = '#Generation charblim_min charblim_max \n'
+        write_lines.append(headerstring)
+
+    charbmin = thedct["fit_cutoff_min_charb"]
+    charbmax = thedct["fit_cutoff_max_charb"]
+
+    carline = str(gcount) + ' ' + str(charbmin) + ' ' + str(charbmax) + '\n'
+    write_lines.append(carline)
+
+    with open(txtfile, 'a') as the_file:
+        for aline in write_lines:
+            the_file.write(aline)
+
 def store_genvar(txtfile, gcount, genvar, fitnesses):
-    """ Write the genetic variety and carbonneau ratio of the current 
+    """ Write the genetic variety and charbonneau ratio of the current 
     genertaion into a textfile.
     """
     write_lines = []
 
     if not os.path.isfile(txtfile):
-        headerstring = ('#Generation median_genvariety carbonneau_ratio '
+        headerstring = ('#Generation median_genvariety charbonneau_ratio '
                         'median_fitness best_fitness \n')
         write_lines.append(headerstring)
 
-    cbest, cmed, cratio = carbonneau_ratio(fitnesses) 
-    carbstring = str(cratio) + ' ' + str(cmed) + ' ' + str(cbest)
+    cbest, cmed, cratio = charbonneau_ratio(fitnesses) 
+    charbstring = str(cratio) + ' ' + str(cmed) + ' ' + str(cbest)
 
     med_genvar = str(np.median(genvar))
-    genvarline = str(gcount) + ' ' + med_genvar + ' ' + carbstring + '\n'
+    genvarline = str(gcount) + ' ' + med_genvar + ' ' + charbstring + '\n'
     write_lines.append(genvarline)
 
     with open(txtfile, 'a') as the_file:
@@ -276,9 +304,110 @@ def gaussian_mutation(baby_genes, paramspace, mutation_rate, gwidth,
 
     return mutated_genes
 
+def genes2str(the_genes, the_pars, add_sig):
+
+    genestring = ''
+    for i in range(len(the_pars)):
+        # Read input from parameter space
+        pstart = the_pars[i][0]
+        pstop = the_pars[i][1]
+        pstep = the_pars[i][2]
+
+        # Assess significant digits.
+        sig_digits = np.ceil(np.log10(abs(float(pstop) - (float(pstart)))) -
+            np.floor(np.log10(float(pstep))))
+        sig_digits = int(sig_digits) + add_sig
+
+        # Convert parameter value to string value
+        gstr = str(int((np.abs(the_genes[i] - pstart)/np.abs(pstop - pstart))*(10**sig_digits - 1))).zfill(sig_digits)
+
+        # Append to gene string of this individual
+        genestring = genestring + gstr
+
+    return genestring
+
+def str2genes(the_str, the_pars, add_sig):
+
+    the_genes = []
+
+    for i in range(len(the_pars)):
+
+        # Read input from parameter space
+        pstart = the_pars[i][0]
+        pstop = the_pars[i][1]
+        pstep = the_pars[i][2]
+        pround = the_pars[i][3]
+
+        # Assess significant digits.
+        sig_digits = np.ceil(np.log10(abs(float(pstop) - (float(pstart)))) -
+            np.floor(np.log10(float(pstep))))
+        sig_digits = int(sig_digits) + add_sig
+
+        # Crop the relevant number of digits from the string
+        print('the_str (i=' + str(i) + ')' , the_str)
+        print('sig_digits ' , sig_digits)
+        par_string = the_str[:sig_digits]
+        the_str = the_str[sig_digits:]
+
+        # Convert to parameter value and round acc to stepsize in input
+        real_val = (float(par_string)/(10**sig_digits - 1))*np.abs(pstop -
+            pstart) + pstart
+        paramarray = np.arange(pstart, pstop, pstep)
+        round_real = find_nearest(paramarray, real_val)
+        round_real = round(round_real, int(pround))
+
+        # Append to array of parameters for this individual
+        the_genes.append(round_real)
+
+    return the_genes
+
+def crossover_strings(mother_str, father_str, clonefrac, pfrac):
+
+    strlen = len(mother_str)
+
+    if random.random() < clonefrac:
+        babygirl = mother_str
+        babyboy = father_str
+    else:
+        if random.random() > pfrac:
+            cutidx = np.random.choice(strlen)
+            babygirl = mother_str[:cutidx] + father_str[cutidx:]
+            babyboy = father_str[:cutidx] + mother_str[cutidx:]
+        else:
+            randidx1, randidx2 =  np.random.choice(strlen, 2, replace=False)
+            cutidx1 = min(randidx1, randidx2)
+            cutidx2 = max(randidx1, randidx2)
+            babygirl = (mother_str[:cutidx1] + father_str[cutidx1:cutidx2] + 
+                mother_str[cutidx2:])
+            babyboy = (father_str[:cutidx1] + mother_str[cutidx1:cutidx2] + 
+                father_str[cutidx2:])
+    return babygirl, babyboy
+
+def mutation_random_string(gene_string, mutrate):
+
+    strlen = len(gene_string)
+    mutidx = np.where(np.random.random(strlen) < mutrate)[0]
+    split_genestring = np.array(list(gene_string))
+    split_genestring[mutidx] = np.random.choice(10, len(mutidx)).astype(str)
+    mutated_genestring = ''.join(str(x) for x in split_genestring)
+
+    return mutated_genestring
+
+def mutation_creep_string(gene_string, mutrate):
+
+    strlen = len(gene_string)
+    mutidx = np.where(np.random.random(strlen) < mutrate)[0]
+    split_genestring = np.array(list(gene_string))
+    creep = (split_genestring[mutidx].astype(int) + 
+        np.random.choice([-1, 1], len(mutidx))) % 10
+    split_genestring[mutidx] = creep.astype(str)
+    mutated_genestring = ''.join(str(x) for x in split_genestring)
+
+    return mutated_genestring
+
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, mut_rate_na,
-    n_ind, na_type, br_type, dgauss):
+    n_ind, na_type, br_type, dgauss, use_string, add_sigs, frac_double):
     """Given a population of individuals and a measure for their
     fitness, generate a new generation of individuals.
 
@@ -293,6 +422,9 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
     approach that uses the fitness directly for weight, it will.
 
     """
+
+    add_sigs = int(add_sigs)
+    frac_double = float(frac_double)
 
     # Rank the individuals according to their fitness
     order = np.argsort(fitm)
@@ -314,31 +446,55 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         mother_genes = pop_orig[mother_idx]
         father_genes = pop_orig[father_idx]
 
-        # Parent genomes produce two baby genomes
-        baby_genes1, baby_genes2 = crossover(mother_genes, father_genes,
-            clone_fraction)
+        # Option to use crossover and reproduction as in Charbonneau+95,
+        # Using strings of numbers representing the parameters.
+        if use_string in ('yes', 'y', 'Yes', 'True', True):
+            # Convert genes to strings
+            mother_str = genes2str(mother_genes, paramspace, add_sigs)
+            father_str = genes2str(father_genes, paramspace, add_sigs)
 
-        # Mutate the baby genomes. There are two modes of mutation.
-        # Load values defining the distributions for the two types. 
-        gauss_w_na = float(gauss_w_na)
-        gauss_w_br = float(gauss_w_br)
-        gauss_b_na = float(gauss_b_na)
-        gauss_b_br = float(gauss_b_br)
-        mut_rate_na = float(mut_rate_na)
+            # Parent genomes produce two baby genomes
+            baby_genes1, baby_genes2 = crossover_strings(mother_str, father_str,
+                clone_fraction, frac_double)
+            
+            # Mutation
+            baby_genes1 = mutation_random_string(baby_genes1, mutation_rate)
+            baby_genes2 = mutation_random_string(baby_genes2, mutation_rate)
 
-        # Narrow mutation: close to original value, high mutation
-        # rate that is in principle fixed 
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
-            mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
-            mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
-        
-        # Broad mutation: further away from original value, lower 
-        # mutation rate that is variable
-        baby_genes1 = gaussian_mutation(baby_genes1, paramspace, 
-            mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
-        baby_genes2 = gaussian_mutation(baby_genes2, paramspace, 
-            mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
+            baby_genes1 = mutation_creep_string(baby_genes1, mutation_rate)
+            baby_genes2 = mutation_creep_string(baby_genes2, mutation_rate)
+
+            # Convert strings back to genes
+            baby_genes1 = str2genes(baby_genes1, paramspace, add_sigs)
+            baby_genes2 = str2genes(baby_genes2, paramspace, add_sigs)
+
+        # Recombination and mutation as described in Brands+in prep.
+        else:
+            # Parent genomes produce two baby genomes
+            baby_genes1, baby_genes2 = crossover(mother_genes, father_genes,
+                clone_fraction)
+
+            # Mutate the baby genomes. There are two modes of mutation.
+            # Load values defining the distributions for the two types.
+            gauss_w_na = float(gauss_w_na)
+            gauss_w_br = float(gauss_w_br)
+            gauss_b_na = float(gauss_b_na)
+            gauss_b_br = float(gauss_b_br)
+            mut_rate_na = float(mut_rate_na)
+
+            # Narrow mutation: close to original value, high mutation
+            # rate that is in principle fixed
+            baby_genes1 = gaussian_mutation(baby_genes1, paramspace,
+                mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
+            baby_genes2 = gaussian_mutation(baby_genes2, paramspace,
+                mut_rate_na, gauss_w_na, gauss_b_na, na_type, double_yn='no')
+
+            # Broad mutation: further away from original value, lower
+            # mutation rate that is variable
+            baby_genes1 = gaussian_mutation(baby_genes1, paramspace,
+                mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
+            baby_genes2 = gaussian_mutation(baby_genes2, paramspace,
+                mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
         if not dup_tf:
@@ -360,9 +516,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
         else:
             dupcount = dupcount + 1
 
-    be_verbose = False
-    if be_verbose:
-        print("DUPLICATE COUNT GEN: " + str(dupcount))
+    print("DUPLICATE COUNT GEN: " + str(dupcount))
 
     return pop_new
 
@@ -425,11 +579,11 @@ def get_top_x_fittest(population, chi_pop, topx):
 
     return best_population, best_chi2s
 
-def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
+def adjust_mutation_rate_charbonneau(old_rate, chi2, mut_rate_factor,
     mut_rate_min, mut_rate_max, fit_cutoff_min, fit_cutoff_max):
     """Adjust the mutation rate based on the typical fitness
     in a population of individuals, as is suggested in
-    Carbonneau."""
+    Charbonneau (1995)"""
 
     # A large ratio means that the difference between the 'typical
     # model' in a generation, and the fittest model is large. In this
@@ -440,7 +594,7 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
     # mutation rate is then increased so that less well explored parts
     # of the parameter space will be probed.
 
-    cbest, cmod, ratio = carbonneau_ratio(chi2) 
+    cbest, cmod, ratio = charbonneau_ratio(chi2) 
 
     if ratio <= fit_cutoff_min:
         new_rate = min(mut_rate_max, old_rate*mut_rate_factor)
@@ -451,10 +605,74 @@ def adjust_mutation_rate_carbonneau(old_rate, chi2, mut_rate_factor,
 
     return new_rate
 
+def auto_charbonneau_limits(dct, charbini):
+    ''' Given the initial Charbonneau ratio of the run, compute
+        reasonable values for the final Charbonnau ratio '''
+
+    ac_fit_a = float(dct['ac_fit_a'])
+    ac_fit_b = float(dct['ac_fit_b'])
+    ac_lowerlim = float(dct['ac_lowerlim'])
+    ac_upperlim = float(dct['ac_upperlim'])
+    ac_max_factor = float(dct['ac_max_factor'])
+    
+    charblim_min = ac_fit_a + charbini*ac_fit_b
+
+    if charblim_min < ac_lowerlim:
+        charblim_min = ac_lowerlim
+    elif charblim_min > ac_upperlim:
+        charblim_min = ac_upperlim
+
+    charblim_max = ac_max_factor*charblim_min
+
+    charblim_min = round(charblim_min,3)
+    charblim_max = round(charblim_max,3)
+
+    dct['fit_cutoff_min_charb'] = charblim_min
+    dct['fit_cutoff_max_charb'] = charblim_max
+
+    return dct
+
+def autoadjust_charbonneau(dct_ctrl, dct_files, gencount):
+    ''' This function adjusts the charbonneau limits (so overrides
+    the ones given in the control file) after the first generation
+    by using the charbonneau ratio of the first generation as an 
+    indication for reasonable limits. This is because while ideally 
+    the ratio reflects only the convergence of the run, in practice
+    it also depends on the spectrum that you fit. This has to be 
+    taken into account when using the limits. 
+    If after ac_maxgen generations the charbonneau lower limit is 
+    still not reached, then automatically increase mutation rate. 
+    '''
+    with open(dct_files["genvar_out"]) as f:
+        content = f.readlines()
+
+    charbini_run = float(content[1].strip().split()[2])
+
+    dct_ctrl = auto_charbonneau_limits(dct_ctrl, charbini_run)
+
+    if gencount > float(dct_ctrl['ac_maxgen']):
+        charb_list = np.genfromtxt(dct_files["genvar_out"]).T[2]
+        min_charb_run = np.min(charb_list)
+        last_charb_run = charb_list[-1]
+
+        if min_charb_run > float(dct_ctrl['fit_cutoff_min_charb']):
+            dct_ctrl['fit_cutoff_min_charb'] = round(last_charb_run +
+                float(dct_ctrl['ac_maxgen_min']),3)
+            dct_ctrl['fit_cutoff_max_charb'] = round(last_charb_run +
+                float(dct_ctrl['ac_maxgen_max']),3)
+
+    return dct_ctrl
+
 def assess_variation(fullgeneration, paramspace, fittest_ind):
     """Look at how many 'steps' each parameter differs from the
     best fitting model. This is a measure for genetic variety
-    of the generation """
+    of the generation
+
+    ***** Function no longer in use *****
+    The problem with this method was that the genetic variety is depending 
+    strongly on the stepsize that you allow for the different parameters. 
+    There are solutions to this, but they are not implemented. 
+    """    
 
     fullgeneration = np.array(fullgeneration)
     fittest_ind = np.array(fittest_ind)
@@ -468,7 +686,13 @@ def assess_variation(fullgeneration, paramspace, fittest_ind):
 def adjust_mutation_genvariety(mutrate, cutdecr, cutincr, mutfactor,
     mutmin, mutmax, mean_gen_var, parspace):
     """ Adjust the mutation rate, depending on genetic genetic
-    variety of the generation."""
+    variety of the generation.
+    
+    ***** Function no longer in use *****
+    The problem with this method was that the genetic variety is depending 
+    strongly on the stepsize that you allow for the different parameters. 
+    There are solutions to this, but they are not implemented. 
+    """
 
     if mean_gen_var > cutdecr *len(parspace):
         mutrate = mutrate/mutfactor
