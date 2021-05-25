@@ -80,7 +80,7 @@ lineinfo = fw.read_data(fd["linelist_in"], fd["normspec_in"])
 ''' PREPARE FASTWIND '''
 
 # Create a FORMAL_INPUT file containing the relevant lines.
-fw.create_FORMAL_INPUT(cdict['inicalcdir'], lineinfo[0])
+fw.create_FORMAL_INPUT(cdict['inicalcdir'], lineinfo[0], fd["linelist_in"])
 
 # Initialise the fitness function with parameters that are
 # the same for every model.

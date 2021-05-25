@@ -1,9 +1,12 @@
 """
 Routine to apply instumental, rotational, and macroturbulent broadening.
-Script from  Michael Abdul Masih
+Script from  Michael Abdul Masih, Calum Hawcroft (2020).
+Altered by Sarah Brands to account for convolving large wavelength
+ranges as might be needed for usage i.c.w. FW v11 (Feb 2021).
+
 Usage:
 > python broaden.py -f <filename> -r <resolving power> -v <vrot> -m <vmacro>
-Needs PyAstronomy on Lisa, to install this:
+Needs PyAstronomy on Lisa, Cartesius to install this:
 > module load python
 > pip install --user PyAstronomy
 """
@@ -16,50 +19,116 @@ warnings.filterwarnings("ignore")
 import sys
 import argparse
 import numpy as np
-from math import sin, pi
-from scipy.interpolate import interp1d 
-from scipy.special import erf 
+from math import sin, pi, ceil
+from scipy.interpolate import interp1d
+from scipy.special import erf
 from scipy.signal import fftconvolve
 from PyAstronomy.pyasl import rotBroad, instrBroadGaussFast
 
-# Settings & constants
+# Settings for rebinning
 binSize = 0.01    # Size of wavelength bins resampled spectrum (Angstrom)
 finalBins = 0.01  # Size of wavelength bins of broadened spectrum (Angstrom)
+
+# Physical values
 limbDark = 0.6    # Limb darkening coefficient (rotational broadening)
 c = 299792.458    # Speed of light in km/s
 
+# Settings for large wavelength intervals
+# An interval of 100.0 A gives a precicion of about 0.001 % compared to
+# using the exact appropiate kernel fore ach wavelength
+range_fast = 100.  # Angstrom. Maximum width of range for using fast broadening
+overlap = 20.0     # Extend the range to account for edges
 
 def main():
     # Read in the needed values from the command line
     arguments = parseArguments()
     # Read in the spectrum
     try:
-        wlc, flux = np.loadtxt(arguments.fileName, unpack=True, skiprows=1)
+        #wlc, flux = np.loadtxt(arguments.fileName, unpack=True, skiprows=1)
+        wlc, flux = np.genfromtxt(arguments.fileName).T
     except IOError as ioe:
         print(ioe, "Input spectrum " + arguments.fileName + " not found!")
         sys.exit()
+
     # Resample input spectrum to even wavelength bins of <binSize> Angstrom
     newWlc = np.arange(wlc[0]+binSize, wlc[-1]-binSize, binSize)
     flux = np.interp(newWlc, wlc, flux)
     wlc = newWlc
-    # Apply instrumental broadening
-    flux = instrBroadGaussFast(wlc, flux, arguments.res, maxsig=5.0, 
-        edgeHandling="firstlast")
-    # Apply rotational broadening
-    flux = rotBroad(wlc, flux, limbDark, arguments.vrot)
-    # Apply macroturbulent broadening
-    if arguments.vmacro not in (-1, None):
-        flux = macroBroad(wlc, flux, arguments.vmacro)
-    # Resample to <finalBins> Angstrom
-    if finalBins != binSize:
-        newWlc = np.arange(wlc[0]+finalBins, wlc[-1]-finalBins, finalBins)
-        flux = np.interp(newWlc, wlc, flux)
-    # Write output file
-    out_f = open(arguments.fileName + ".fin", 'w')
-    out_f.write("#" + str(len(wlc)) + "\t" + "#0 \n")
-    for i in range(len(wlc)-1):
-        out_f.write(str(wlc[i]) + "\t" + str(flux[i]) + "\n")
-    out_f.close()
+
+    # Check the total width of the wavelength interval
+    # If this is smaller than a certain value, apply the fast broadening,
+    # i.e. one kernel for all wavelengths
+    # If the wavelength interval is large, then cut the interval into
+    # pieces, use an appropiate interval for each piece, and stitch together.
+    totalwidth = wlc[-1]-wlc[0]
+    if totalwidth < range_fast:
+        # Apply instrumental broadening
+        flux = instrBroadGaussFast(wlc, flux, arguments.res,
+            maxsig=5.0, edgeHandling="firstlast")
+        # Apply rotational broadening
+        flux = rotBroad(wlc, flux, limbDark, arguments.vrot)
+        # Apply macroturbulent broadening
+        if arguments.vmacro not in (-1, None):
+            flux = macroBroad(wlc, flux, arguments.vmacro)
+        # Resample to <finalBins> Angstrom
+        if finalBins != binSize:
+            newWlc = np.arange(wlc[0]+finalBins, wlc[-1]-finalBins, finalBins)
+            flux = np.interp(newWlc, wlc, flux)
+        convolved_flux_all = flux
+        convolved_wave_all = newWlc
+    else:
+        nparts = int(ceil(totalwidth/range_fast))
+        partwidth = totalwidth / nparts
+        lenbins = len(wlc[wlc < wlc[0] + partwidth])
+        partwidthext = partwidth + overlap
+        lenbinsext = len(wlc[wlc < wlc[0] + partwidthext])
+        extrabins = lenbinsext - lenbins
+
+        idxlow_list = []
+        idxhigh_list = []
+        for i in range(nparts):
+            idxlow = max(0, i*lenbins - extrabins)
+            idxhigh = min(i*lenbins + lenbins + extrabins, len(wlc))
+
+            idxlow_list.append(idxlow)
+            idxhigh_list.append(idxhigh)
+
+        convolved_flux_all = np.array([])
+        convolved_wave_all = np.array([])
+
+        for startarg, endarg, counter in zip(idxlow_list, idxhigh_list, range(nparts)):
+            wlcpart = wlc[startarg:endarg]
+            fluxpart = flux[startarg:endarg]
+
+            fluxpart = instrBroadGaussFast(wlcpart, fluxpart, arguments.res,
+                maxsig=5.0, edgeHandling="firstlast")
+
+            # Apply rotational broadening
+            fluxpart = rotBroad(wlcpart, fluxpart, limbDark, arguments.vrot)
+            # Apply macroturbulent broadening
+            if arguments.vmacro not in (-1, None):
+                fluxpart = macroBroad(wlcpart, fluxpart, arguments.vmacro)
+            # Resample to <finalBins> Angstrom
+            if finalBins != binSize:
+                newWlcpart = np.arange(wlcpart[0]+finalBins, wlcpart[-1]-finalBins, finalBins)
+                fluxpart = np.interp(newWlcpart, wlcpart, fluxpart)
+                wlcpart = newWlcpart
+
+            if counter == 0:
+                wlcpart = wlcpart[0:-extrabins]
+                fluxpart = fluxpart[0:-extrabins]
+            elif counter == nparts - 1:
+                wlcpart = wlcpart[extrabins:]
+                fluxpart = fluxpart[extrabins:]
+            else:
+                wlcpart = wlcpart[extrabins:-extrabins]
+                fluxpart = fluxpart[extrabins:-extrabins]
+
+            convolved_flux_all = np.concatenate((convolved_flux_all, fluxpart))
+            convolved_wave_all = np.concatenate((convolved_wave_all, wlcpart))
+    
+    np.savetxt(arguments.fileName + ".fin", np.array([convolved_wave_all, convolved_flux_all]).T)
+
     exit()
 
 def parseArguments():
@@ -118,10 +187,11 @@ def macroBroad(xdata, ydata, vmacro):
     last = xdata[-1] + float(int(profile.size / 2.0 + 0.5)) * xspacing
     x2 = np.linspace(first, last, extended.size)
 
-    conv_mode = "valid"
+    conv_mode = "same"
 
     # Do the convolution
     newydata = fftconvolve(extended, profile / profile.sum(), mode=conv_mode)
+    newydata = newydata[len(before):len(before)+len(ydata)]
 
     return newydata
 

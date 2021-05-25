@@ -236,7 +236,7 @@ def convert_vclmax_add(vclstart, vclextend, addition):
 def get_vclmax(dct):
     """ If the value for vclmax is -1, we adopt 2*vclstart 
         If it can vary freely (between e.g. 0 and 1.0) then it is
-        checked that the chosen value is nog lower than vstart. If
+        checked that the chosen value is not lower than vstart. If
         it is, then it is adapted to a physical value. 
     """
 
@@ -424,9 +424,13 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     add2indat(inl, dct, ['C'], 'C')
     add2indat(inl, dct, ['N'], 'N')
     add2indat(inl, dct, ['O'], 'O')
-    add2indat(inl, dct, ['Si'], 'SI')
     add2indat(inl, dct, ['Mg'], 'MG')
+    add2indat(inl, dct, ['Si'], 'SI')
     add2indat(inl, dct, ['P'], 'P')
+    add2indat(inl, dct, ['S'], 'S')
+    add2indat(inl, dct, ['Fe'], 'FE')
+    add2indat(inl, dct, ['Na'], 'NA')
+    add2indat(inl, dct, ['Ca'], 'CA')
 
     # Include X-rays if the volume filling fraction fx > 0.0
     # (fx = 0 means no volume filled with X-rays, so exclude X-rays)
@@ -466,7 +470,7 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
         f.write(dct['vrot'] + '\n')
         f.write(dct['macro'] + '\n')
 
-    return dct['radius']
+    return dct['radius'], dct['rmax']
 
 def read_linelist(theflinelist):
     """Read the line_list file and output numpy arrays"""
@@ -477,16 +481,15 @@ def read_linelist(theflinelist):
 def parallelcrop(list1, list2, list3, start_list1, stop_list1):
     """ Based on values in list1, crop the same arguments of 
     list2 and 3. Used for cropping spectra based on wavelength
-    boundaries. """
+    boundaries. If list3 equals [], only 2 lists are cropped"""
 
-    minarg = np.argmax(list1>start_list1)
-    maxarg = np.argmax(list1>stop_list1)
-
-    newlist1 = list1[minarg:maxarg]
-    newlist2 = list2[minarg:maxarg]
-    newlist3 = list3[minarg:maxarg]
-
-    return newlist1, newlist2, newlist3
+    newlist1 = list1[(list1 > start_list1) & (list1 < stop_list1)]
+    newlist2 = list2[(list1 > start_list1) & (list1 < stop_list1)]
+    if list3 == []:
+        return newlist1, newlist2
+    else: 
+        newlist3 = list3[(list1 > start_list1) & (list1 < stop_list1)]
+        return newlist1, newlist2, newlist3
 
 def renorm(wave, flux, lx, ly, rx, ry):
     """Rernormalise the data with a linear fit through the points
@@ -508,6 +511,30 @@ def renorm(wave, flux, lx, ly, rx, ry):
 
     return renorm
 
+def rvshift(lamb0, vr):
+    """
+    Apply a radial velocity (RV) shift to a wavelength (range).
+
+    Input parameters:
+        - lamb0: wavelength (float or np array) in angstrom
+        - vr: radial velocity in km/s (float)
+    Output:
+        - Wavelength or wavelength array with RV shift applied.
+    """
+    
+    # Constants
+    c = 2.99792458*10**10 #cm/s
+    angstrom = 1.0*10**-8 # multiply to go from Angstrom to cm
+    kms = 10**-5 # multiply to go from cm/s to km/s
+
+    lamb0 = lamb0 * angstrom
+    vr = vr / kms
+    deltalamb = (vr/c) * lamb0
+    lamb0 = lamb0 - deltalamb
+    lamb0 = lamb0 / angstrom
+
+    return lamb0
+
 def read_data(flinelist, fnorm):
     """Based on the line_list info, select the right data
     from the spectrum, and output data, line names and resolution.
@@ -527,17 +554,18 @@ def read_data(flinelist, fnorm):
     """
 
     names, llp = read_linelist(flinelist)
-    res, lbound, rbound, rv, normlx, normly, normrx, normry, lw = llp
+    res, lbound, rbound, rv, normlx, normly, normrx, normry, lw, ang = llp
 
     data_per_line = []
     wave, norm, error = np.genfromtxt(fnorm).T
     for i in range(len(names)):
-
         # Per line select data, renormalise
         wv, nm, er = parallelcrop(wave, norm, error, lbound[i], rbound[i])
-        nm = renorm(wv, nm, normlx[i], normly[i], normrx[i], normry[i])
+        if normly[i] != 0.0 or normry[i] != 0.0:
+            nm = renorm(wv, nm, normlx[i], normly[i], normrx[i], normry[i])
+        if rv[i] != 0.0:
+            wv = rvshift(wv, rv[i])
         data_per_line.append([wv, nm, er])
-
     data_per_line = np.array(data_per_line)
 
     return names, res, data_per_line, lw
@@ -582,7 +610,7 @@ def execute_fastwind(atom, fwtimeout, moddir):
     write_output = ' > pnlte.log'
     do_pnlte = timeout + pnlte_eo + write_output
 
-    pformal_eo = './pformalsol_' + atom + '.eo '
+    pformal_eo = 'timeout 15m ./pformalsol_' + atom + '.eo '
     read_input = '< formal.in '
     write_output = ' > pformal.log'
     do_pformal = pformal_eo + read_input + write_output
@@ -596,12 +624,21 @@ def execute_fastwind(atom, fwtimeout, moddir):
     os.chdir('../../../../')
 
 def read_fwline(OUT_file):
-    '''Get wavelength and normflux from OUT. file'''
-    tmp_matrix = np.genfromtxt(OUT_file, max_rows=161).T
-    if tmp_matrix.size == 0:
-        wave, flux = [0], [0]
+    '''Get wavelength and normflux from OUT.-file
+       Treat CMF parts of the spectrum different from v10-
+       like lines'''
+    if not OUT_file.split('OUT.')[-1].startswith('UV_'):
+        tmp_matrix = np.genfromtxt(OUT_file, max_rows=161).T
+        if tmp_matrix.size == 0:
+            wave, flux = [0], [0]
+        else:
+            wave, flux = tmp_matrix[2], tmp_matrix[4]
     else:
-        wave, flux = tmp_matrix[2], tmp_matrix[4]
+        tmp_matrix = np.genfromtxt(OUT_file).T
+        if tmp_matrix.size == 0:
+            wave, flux = [0], [0]
+        else:
+            wave, flux = tmp_matrix[1], tmp_matrix[3]
     return wave, flux
 
 def prep_broad(linename, line_file, moddir):
@@ -641,11 +678,16 @@ def apply_broadening(mname, moddir, linenames, lineres):
     for line in linefiles:
         the_line_name = line.rpartition('_')[0][4:]
         the_line_name = the_line_name.rpartition('OUT.')[-1]
+        if the_line_name.startswith('UV_'):
+            lsplit = the_line_name.split('_')
+            the_line_name = 'UV_' + lsplit[1] + '_' + lsplit[2]
+        else:
+            the_line_name = the_line_name.rpartition('OUT.')[-1]
         linenames_fromfile.append(the_line_name)
 
-    # If this command takes longer than 5 min than certainly
+    # If this command takes longer than 10 min than certainly
     # something is wrong
-    do_broaden = 'timeout 5m python broaden.py -f '
+    do_broaden = 'timeout 10m python broaden.py -f '
 
     # Read in the broadening properties for the model.
     vrot, vmacro = np.genfromtxt(inicalcdir + 'broad.in')
@@ -744,10 +786,17 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     rchi2_line = chi2_line / dof_line
 
     if len(wave_mod) > maxlen:
+        # Adjust maxlen in case of a CMF line
+        if nme.startswith('UV_'):
+            delta_wave_data = wave_data[1] - wave_data[0]
+            delta_save = delta_wave_data * 10.0
+            maxlen = (max(wave_data)-min(wave_data))/delta_save
+
         # Replace the model output by a low resolution spectrum
         save_wave = np.linspace(min(wave_data), max(wave_data), maxlen)
         flux_mod_save = interp_modflux(save_wave, wave_mod, flux_mod_orig)
-        np.savetxt(linefile, np.array([save_wave,flux_mod_save]).T)
+        np.savetxt(linefile, np.array([save_wave,flux_mod_save]).T, 
+            fmt='%10.5f')
 
     # #FIXME an unconvolved low res copy could be saved here
 
@@ -782,7 +831,6 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     """
 
     linenames, lineres, linedata, lineweight = lineinfo
-
     moddir = moddir + modname + '/profiles/'
     linefiles = []
     for lname in linenames:
@@ -839,7 +887,7 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
         linenames, fitnesses_lines)
 
 def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad, 
-        xlum):
+        xlum, ionfluxinfo):
     """ Write the paramters and fitness of an individual to the
     chi2-textfile.
     """
@@ -850,11 +898,12 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad,
     write_lines = []
 
     if not os.path.isfile(txtfile):
-        hstring = '#run_id gen chi2 rchi2 dof fitness maxit maxcorr cputime '
+        hstring = '#run_id gen chi2 rchi2 dof fitness maxcorr maxit cputime '
         for pname in paramnames:
             hstring = hstring + pname + ' '
         hstring = hstring + 'radius '
         hstring = hstring + 'xlum '
+        hstring = hstring + 'logq0 logQ0 logq1 logQ1 logq2 logQ2 '
         for linenm in linenames:
             hstring = hstring + linenm + ' '
         hstring = hstring + '\n'
@@ -868,7 +917,9 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad,
     for param in genes:
         istr = istr + str(param) + ' '
     istr = istr + str(rad) + ' '
-    istr = istr + str(xlum) + ' ' 
+    istr = istr + str(xlum) + ' '
+    for aflux in ionfluxinfo:
+        istr = istr + str(aflux) + ' '  
     for lfit in linefitns:
         istr = istr + str(lfit) + ' '
     istr = istr + '\n'
@@ -978,6 +1029,79 @@ def get_xlum_out(moddir, mname):
 
     return xlum
 
+def ionizing_fluxes(lam, fnu, radius):
+    c = 2.99792458e10
+    h = 6.6260755e-27
+    rsun = 6.96e10
+
+    nu = c/lam
+    integrand = np.pi*fnu/nu/h
+    sorting = nu.argsort()
+    nu = nu[sorting]
+    integrand = integrand[sorting]
+    nulow_HI = c/912.
+    nulow_HeI = c/504.
+    nulow_HeII = c/228.
+    nuHI, integrandHI = parallelcrop(nu, integrand, [], nulow_HI, 1e100)
+    nuHeI, integrandHeI = parallelcrop(nu, integrand, [], nulow_HeI, 1e100)
+    nuHeII, integrandHeII = parallelcrop(nu, integrand, [], nulow_HeII, 1e100)
+    q0 = np.trapz(integrandHI, nuHI)
+    Q0 = q0 * 4*np.pi * (radius*rsun)**2
+    logq0 = round(np.log10(q0),3)
+    logQ0 = round(np.log10(Q0),3)
+    q1 = np.trapz(integrandHeI, nuHeI)
+    Q1 = q1 * 4*np.pi * (radius*rsun)**2
+    logq1 = round(np.log10(q1),3)
+    logQ1 = round(np.log10(Q1),3)
+    q2 = np.trapz(integrandHeII, nuHeII)
+    Q2 = q2 * 4*np.pi * (radius*rsun)**2
+    logq2 = round(np.log10(q2),3)
+    logQ2 = round(np.log10(Q2),3)
+
+    return logq0, logQ0, logq1, logQ1, logq2, logQ2
+
+def read_fluxcont(moddir, mname, rstar, rmax_fw):
+    """Check if FLUXCONT is there and if so, read it to get out 
+       the ionising fluxes. 
+       Input: path to model directory and model name,
+           maximum radius of FW model, stellar radius (both in rsun).
+       Output: Q0, Q1, Q2
+    """
+    
+    fluxcont = moddir + mname + '/FLUXCONT'
+
+    if os.path.isfile(fluxcont):
+   
+        # Look up the number of useful lines in the FLUXCONT
+        lcount = -2
+        for aline in open(fluxcont, 'r').readlines():
+            lcount = lcount+1
+            if len(aline.split()) == 1:
+                break
+
+        rsun = 6.96e10 # cm
+        rstar = float(rstar)
+        rmax_fw = float(rmax_fw)
+        stellar_surface = 4*np.pi*(rsun*rstar)**2
+
+        # Only read non empty files, FLUXCONT has typically about 
+        # 1700-1800 lines containing flux information
+        if lcount > 500: 
+            # Get FASTWIND spectrum
+            lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount, 
+                skip_header=1, delimiter='').T[1:3]
+            fnu = 10**logFnu # ergs/s/cm^2/Hz / RMAX^2
+            flam = 3.00* 1e18 * fnu / (lam**2) # ergs/s/cm^2/A /RMAX^2
+            flam = flam * stellar_surface # ergs/s/A /RMAX^2
+            flam = flam * rmax_fw**2 # ergs/s/A
+    
+            q0, Q0, q1, Q1, q2, Q2 = ionizing_fluxes(lam, fnu, rstar)
+            
+            return [q0, Q0, q1, Q1, q2, Q2]
+    
+    return [-888, -888, -888, -888, -888, -888]
+
+
 def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     fw_timeout, lineinfo, dof, fitmeasure, chi2file, paramnames, name_n_genes):
     """Evaluate the fitness of an individual. This step is
@@ -995,9 +1119,8 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     mname, genes = name_n_genes
 
     moddir = init_mod_dir(inicalcdir, rundir, mname)
-    radius = create_indat(genes, mname, moddir, *all_pars)
+    radius, rmax = create_indat(genes, mname, moddir, *all_pars)
     out = run_fw(modelatom, moddir, mname, fw_timeout, lineinfo)
-
     if out == 0:
         fitinfo = failed_model(lineinfo[0])
     else:
@@ -1005,9 +1128,10 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
 
     runinfo = get_runinfo(moddir)
     xlum = get_xlum_out(moddir, mname)
+    ionfluxinfo = read_fluxcont(moddir, mname, radius, rmax)
     clean_run(moddir, mname, savedir, out)
     store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname, 
-        radius, xlum)
+        radius, xlum, ionfluxinfo)
 
     return fitinfo[0], fitinfo[3]
 
@@ -1135,7 +1259,7 @@ def init_mod_dir(inidir, therundir, modname):
     mkdir(moddir + modname)
     return moddir
 
-def create_FORMAL_INPUT(inidir, line_subset, create=True):
+def create_FORMAL_INPUT(inidir, line_subset, lfile, create=True):
     """Create a FORMAL_INPUT file that contains only the lines that
     will be fitted. Based on the linelist we go through the
     FORMAL_INPUT "master" file and only copy those that we need to
@@ -1146,6 +1270,10 @@ def create_FORMAL_INPUT(inidir, line_subset, create=True):
     If the parameter 'create' is false, only a check is done, 
     and the FORMAL input file is not really created. 
     """
+    
+    # Read all line-info, this is needed for the UV_ v11 lines
+    thelnames, llp = read_linelist(lfile)
+    res, lbound, rbound, rv, normlx, normly, normrx, normry, lw, ang = llp
 
     # Navigate to the main inicalc directory, the one that will
     # be copied all the time.
@@ -1182,6 +1310,15 @@ def create_FORMAL_INPUT(inidir, line_subset, create=True):
                     continueline = False
                 formal_new.append(line)
 
+    for ic in range(len(thelnames)):
+        theUVline = thelnames[ic]
+        if theUVline.startswith('UV_'):
+            thelb = str(int(theUVline.split('_')[1]))
+            therb = str(int(theUVline.split('_')[2]))
+            theang = str(ang[ic])
+            newformalin = 'UV ' + thelb + ' ' + therb + ' ' + theang + '\n'
+            formal_new.append(newformalin)
+
     if create:
         # Write the collected lines to the new FORMAL_INPUT file.
         # This is the file that will be used during the run.
@@ -1195,8 +1332,9 @@ def create_FORMAL_INPUT(inidir, line_subset, create=True):
 
     missing_lines = []
     for aline in line_subset:
-        if aline not in list_formal_lines:
-            missing_lines.append(aline)
+        if not aline.startswith('UV_'):
+            if aline not in list_formal_lines:
+                missing_lines.append(aline)
 
     if missing_lines != []:
         print('ERROR! Some diagnostic lines are not ' + 

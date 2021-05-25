@@ -24,8 +24,20 @@ from PyPDF2 import PdfFileMerger
 import fastwind_wrapper as fw
 import population as pop
 
-jobscriptfile = 'run_pyEA.job'
-hours_str = '50' # wall time 
+jobscriptfile = 'run_pyEA.job' # name of job script file 
+hours_str = '72' # maximum wall time 
+n_cpu_core = 24.0 # number of CPUs per node
+username = 'sbrands'
+codedir = 'pyEA'
+
+
+# For spectral regions wider than this, an extra wide plot will be made.
+wide_specrange_lim = 100.0 # Angstrom
+
+# When checking the UV/CMF range, a computed spectral range is considered
+# "too large" when it is larger than x Angstrom from the edge of the 
+# range that is fitted.
+larger_wavemax = 5.0 # Angstrom
 
 run_name = sys.argv[1]
 if run_name.endswith('/'):
@@ -49,6 +61,7 @@ spectrumname = inputdir + 'spectrum.norm'
 
 param_fig = inputdir + 'parameter_input.pdf'
 spectrum_fig = inputdir + 'spectrum_input.pdf'
+spectrum_fig2 = inputdir + 'spectrum_input2.pdf'
 
 pdfs = [param_fig, spectrum_fig]
 merged_report = inputdir + "pre_run_report.pdf"
@@ -85,6 +98,15 @@ otherhalfpt = int((nd - len(intro) - halfpt))
 print('\n' + halfpt*'#'  + intro + otherhalfpt*'#')
 checkdict = {}
 
+# Checking the format of line_list.txt before attempting to read 
+ll_check = np.genfromtxt(linesetname).T
+ncol_linedata = len(ll_check)
+ncol_line_needed = 11     
+if ncol_linedata != ncol_line_needed:
+    print("    ERROR in line_list.txt: found " + str(ncol_linedata) + " columns "
+       "(" + str(ncol_line_needed) +  " expected). Exiting.")
+    sys.exit()
+
 # Read in files
 ctrldct = fw.read_control_pars(controlname)
 lineinfo = fw.read_data(linesetname, spectrumname)
@@ -105,15 +127,69 @@ if test_inidir not in next(os.walk('.'))[1]:
     sys.exit()
 
 # Check n_ind
-n_cpu_core = 24.0
 if (ctrldct["nind"]+1)/n_cpu_core % 1.0  > 0.0:
-    print("ERROR! Not using all " + str(n_cpu_core) + " cpu's per" 
+    print("WARNING!! not using all " + str(n_cpu_core) + " cpu's per" 
         " core")
-    sys.exit()
+    input('Press enter to ignore...')
 
 print("\nnind = " + str(ctrldct["nind"]))
 print("ngen = " + str(ctrldct["ngen"]))
 
+printsection("FW version")
+# Check version 10 vs 11
+checkdict["FW version"] = True 
+if ctrldct["inicalcdir"].startswith('v10'):
+    inic0 = ctrldct["inicalcdir"]
+    modelat0 = ctrldct["modelatom"]
+    if not os.path.isfile(inic0 + "pnlte_" + modelat0 + ".eo"):
+        print("ERROR! " + inic0 + "pnlte_" + modelat0 + ".eo not found")
+        checkdict["FW version"] = False
+    if not os.path.isfile(inic0 + "pformalsol_" + modelat0 + ".eo"):
+        print("ERROR! " + inic0 + "pformalsol_" + modelat0 + ".eo not found")
+        checkdict["FW version"] = False
+    if modelat0 == 'A10HHe':
+        print("WARNING: do you really want to use model atom A10HHe" +
+            " in combination with v10?")
+        checkdict["FW version"] = False
+    for aline in lineinfo[0]:
+        if aline.startswith('UV_'):
+            print("ERROR: CMF line included in linelist: " + aline)
+            print("   This is not possible with v10. Aborting pre-run check")
+            sys.exit()
+elif ctrldct["inicalcdir"].startswith('v11'):
+    if not ctrldct["modelatom"] == 'A10HHe':
+        print("ERROR! Use modelatom 'A10HHe' for the CMF version 11 of FW")
+        checkdict["FW version"] = False
+    for aline in lineinfo[0]:
+        if not aline.startswith('UV_'):
+            print("ERROR: non CMF line included in linelist: " + aline)
+            print("   This is not tested for v11. Aborting pre-run check")
+            sys.exit()
+        strt0, stop0 = aline.split('_')[1:]
+        if len(strt0) == 5 and len(stop0) == 5:
+            if not float(stop0) > float(strt0):
+                print("ERROR: format of UV line not correct: " + aline)
+                print("Stop wavelength should exceed start wavelength")
+                print("Exiting")
+                sys.exit()
+        else:
+            print("ERROR: format of UV line not correct: " + aline)
+            print("  Format should be: UV_xxxxx_yyyyy with x and y start" +
+            " start stop wavelengths \n   of the lines in Angstrom, padded" +
+            " with leading zeros to 5 digit numbers. \n   e.g. " +
+            " UV_01211_01625 for the range 1211-1625 Ansgtrom. \n   Exiting.")
+            sys.exit()
+else:
+    print("WARNING: Inicalc dir does not start with v10 or v11: " +
+        "no proper checks can be carried out on input files")
+    checkdict["FW version"] = False
+
+if checkdict["FW version"]:
+    print("FW version ok")
+else:
+    print("Potential problems with FW version/model atom")
+    print("   Check modelatom and inicalcdir combination")
+    
 # Check mutation rate parameters
 printsection('Mutation rate')
 checkdict["Mutation"] = True
@@ -201,11 +277,140 @@ if mut_adj_type == 'autocharb':
     print('ac_upperlim     ' + ac_upperlim)
 
 # Checks on parameter space
-
 all_names = np.concatenate((np.concatenate((param_names,fixed_names)),defnames))
 nonfree_names = np.concatenate((fixed_names,defnames))
 nonfree_vals = np.concatenate((fixed_pars,defvals))
 allp_dict = dict(zip(nonfree_names, nonfree_vals))
+
+# Check if all elements are in defaults
+# If an addional parameter is needed in an update of the GA, then
+# add it to this list to ensure a run does not crash if you copy 
+# an old defaults_fastwind.txt file
+fastwind_def_complete = ['C',
+                         'N',
+                         'O',
+                         'Si',
+                         'Mg',
+                         'P',
+                         'Fe',
+                         'S',
+                         'Na',
+                         'Ca',
+                         'optne_update',
+                         'he_one',
+                         'it_start',
+                         'itmore',
+                         'optmixed',
+                         'rmax',
+                         'tmin',
+                         'vmin_start',
+                         'beta',
+                         'vdiv',
+                         'ihe_start',
+                         'optmod',
+                         'opttlucy',
+                         'megas',
+                         'accel',
+                         'optcmf',
+                         'micro',
+                         'metallicity',
+                         'lines',
+                         'lines_in_model',
+                         'enat_cor',
+                         'expansion',
+                         'set_first',
+                         'set_step',
+                         'fclump',
+                         'logfclump',
+                         'vclstart', 
+                         'vclmax', 
+                         'opthopf', 
+                         'do_iescat',
+                         'vclmax', 
+                         'opthopf', 
+                         'do_iescat',
+                         'opthopf',
+                         'do_iescat',
+                         'do_iescat',
+                         'windturb',
+                         'fic',
+                         'hclump',
+                         'fx',
+                         'uinfx',
+                         'mx',
+                         'gamx',
+                         'Rinx',
+                         'logfx']
+
+for a_def_par in fastwind_def_complete:
+    #if not ((a_def_par in defnames) or (a_def_par in param_names)):
+    if not a_def_par in all_names:
+        print("\n\n   ERROR: '" + a_def_par + "' neither in defaults_" +
+              "fastwind.txt nor in parameter_space.txt\n\n")
+        sys.exit()
+
+printsection('Line list')
+# Checks on line_list.txt
+checkdict["Line list"] = True
+for ii in range(len(lineinfo[0])):
+    lname0 = lineinfo[0][ii]
+    lineweight = ll_check[9][ii]
+    uvres0 = ll_check[10][ii]
+    uvlb0 = ll_check[2][ii]
+    uvrb0 = ll_check[3][ii]
+    norml0 = ll_check[6][ii]
+    normr0 = ll_check[8][ii]
+    rvcorr0 = ll_check[4][ii]
+    if norml0 != 0.0 or normr0 != 0.0:
+        print("WARNING: normalisation correction used for line " + lname0 + 
+            ".\n    This should work in principle, but is not extensively " +
+            "tested.\n    Please carefully check the output of this run.")
+        checkdict["Line list"] = False
+    if rvcorr0 != 0.0:
+        print("WARNING: radial velocity correction used for line " + lname0 + 
+            ".\n    This should work in principle, but is not extensively " +
+            "tested.\n    Please carefully check the output of this run.")
+        checkdict["Line list"] = False
+    if lname0.startswith('UV_'):
+        if not uvres0 > 0:
+            print('ERROR! Line ' + lname0 + ' needs a stepsize > 0 Angstrom')
+            print('    Please edit column 11 of line_list.txt. Exiting.')
+            sys.exit()
+        elif uvres0 < 0.05:
+            print('WARNING: Line ' + lname0 + ' will be computed with a step ' +
+                'size of ' + str(uvres0) + '\n   Computation may be slow. ')
+            checkdict["Line list"] = False 
+        elif uvres0 > 1.0:
+            print('WARNING: Line ' + lname0 + ' will be computed with a step ' +
+                'size of ' + str(uvres0) + '\n   Is this small enough? ')
+            checkdict["Line list"] = False 
+        nameL = float(lname0.split('_')[1])
+        nameR = float(lname0.split('_')[2])
+        if (nameL-uvlb0 < -larger_wavemax or uvrb0-nameR < -larger_wavemax):
+            print("WARNING: wavelength range specified do not correspond " +
+                "to name of CMF line: \n    " + lname0 + 
+                " (lbound=" + str(uvlb0) + ", rbound=" + str(uvrb0) +")" + 
+                "\n    Model region much larger than fitting region!")
+            checkdict["Line list"] = False
+        if (uvlb0-nameL < 0.0 or nameR-uvrb0 < 0.0):
+            print("ERROR: wavelength range specified do not correspond " +
+                "to name of CMF line: \n    " + lname0 + 
+                " (lbound=" + str(uvlb0) + ", rbound=" + str(uvrb0) +")" +
+                "\n    Model region does not cover fitting region!")
+            checkdict["Line list"] = False
+    elif not uvres0 == 0:
+            print('ERROR for line_list.txt, line: ' + lname0) 
+            print('Column 11 of line_list.txt should equal 0.0 for ' +
+                ' a non CMF line.')
+            checkdict["Line list"] = False
+    if lineweight != 1.0 and ctrldct["fitmeasure"] == 'chi2':
+        print("WARNING! Line weight of " + lname0 + " != 1.0, but " +
+            "fitmeasure is chi2. \n     Lineweight has no effect: " +
+            " \n      choose fitness as fitmeasure or set all weights to 1.0")
+        checkdict["Line list"] = False
+        
+if checkdict["Line list"]:
+    print("Line list seems ok, but please check also the plot")
 
 printsection('Parameter space')
 print('Number of free parameters: ' + str(len(param_names)))
@@ -299,6 +504,11 @@ else:
         else:
             print("   - fx is fixed at " + allp_dict['fx'])
     if need_xraydetails:   
+        if ctrldct["inicalcdir"].startswith('v11'):
+            print("ERROR: X-rays not yet included in GA for CMF version 11.")
+            print("Please set fx to -1 and logfx to > 1.3 or change to v10.")
+            print("Exiting.")
+            sys.exit()
         if 'teff' not in param_names:
             if float(allp_dict['teff']) < 25000.0:
                 print("ERROR: X-rays included but Teff fixed to < 25000")
@@ -392,6 +602,19 @@ if 'fic' not in param_names:
         print('ERROR: no thick clumping, but ' + tparams + ' varied!')
         checkdict["Parameter space"] = False
 
+if ctrldct["inicalcdir"].startswith("v11"):
+    if 'fic' in param_names:
+        print("ERROR: optically thick clumping not in CMF version 11!")
+        print("Exiting")
+        sys.exit()
+    elif 'fic' in fixed_names:
+        for i in range(len(fixed_names)):
+            if fixed_names[i] == 'fic':
+                 if fixed_pars[i] != -1:
+                     print("ERROR: optically thick clumping not in CMF" +
+                          " version 11! fic != -1. Exiting.")
+                     sys.exit() 
+        
 if checkdict["Parameter space"] == True:
     print('\nParameter space ok.')
 
@@ -432,12 +655,12 @@ for i in range(len(param_space)):
 
 if checkdict['Step size'] == True:
     print('All stepsizes ok.')
-         
+
 # Check wheter all lines in the line list are present in the 
 # FORMAL_INPUT master file 
 printsection('Formal Input')
 tf_formal = fw.create_FORMAL_INPUT(ctrldct["inicalcdir"], lineinfo[0], 
-    create=False)
+    linesetname,create=False)
 checkdict["FORMAL_INPUT"] = tf_formal
 
 # Check properties reinsertion scheme
@@ -483,6 +706,7 @@ if not checkdict['Step size']:
 print('\nMaking plots...')
 ncols = 3
 nrows =int(math.ceil(1.0*len(param_space)/ncols))
+nrows =max(nrows, 2)
 
 w_gauss_na = ctrldct["w_gauss_na"]
 w_gauss_br = ctrldct["w_gauss_br"]
@@ -557,13 +781,16 @@ names, res, data_per_line, lweight = lineinfo
 
 left_bounds = line_params[1]
 right_bounds = line_params[2]
+radial_vels = line_params[3]
 
 ncols = 4
 nrows =int(math.ceil(1.0*len(names)/ncols))
+nrows =max(nrows, 2)
 
 ccol = ncols - 1
 crow = -1
 props = dict(facecolor='white', alpha=1.0)
+props2 = dict(facecolor='darkblue', alpha=0.8)
 errprops = dict(facecolor='red', alpha=1.0)
 fig, ax = plt.subplots(nrows, ncols, figsize=(3*ncols, 3*nrows))
 
@@ -591,19 +818,21 @@ for i in range(ncols*nrows):
 
     for j in range(len(lnames)):
         if lnames[j] == names[i]:
-            lbound = left_bounds[j]
-            rbound = right_bounds[j]
+            lbound = fw.rvshift(left_bounds[j], radial_vels[j])
+            rbound = fw.rvshift(right_bounds[j], radial_vels[j])
+            the_rv = radial_vels[j]
     wave, flux, err = data_per_line[i]
     resolution = res[i]
     linename = names[i]
     weight = lweight[i]
 
-    swave, sflux, serr = fw.parallelcrop(specwave, specflux, specerr,
+    specwave_rv = fw.rvshift(specwave, the_rv)
+    swave, sflux, serr = fw.parallelcrop(specwave_rv, specflux, specerr,
         lbound-extra_AA, rbound+extra_AA)
 
     npoint_error = False
     if not len(wave) > len(param_names) + 1:
-        print('\nERROR! Too few data points for this line compared to' 
+        print('\nERROR! Too few data points for this line compared to ' 
             'the amount of free parameters.')
         print('Line: ' + linename)
         print('Data points: ' + str(len(wave)))
@@ -616,6 +845,10 @@ for i in range(ncols*nrows):
         ax[crow,ccol].axvspan(lbound,rbound, color='green', alpha=0.3)
     else:
         ax[crow,ccol].axvspan(lbound,rbound, color='gold', alpha=0.3)
+    if the_rv != 0.0:
+        ax[crow, ccol].text(0.50, 0.9, "rv = " + str(the_rv) + ' km/s', 
+            transform=ax[crow,ccol].transAxes, fontsize=8, bbox=props2,
+            ha='center', color='white')
     ax[crow,ccol].errorbar(swave, sflux, yerr=serr, ls='', fmt='o',
         color='C0', alpha=0.5, markersize=3.0)
     ax[crow,ccol].errorbar(wave, flux, yerr=err, ls='', fmt='o',
@@ -638,7 +871,56 @@ fig.suptitle('Spectrum check: ' + run_name, fontsize=14)
 fig.tight_layout(rect=[0, 0.03, 1, 0.93])
 plt.savefig(spectrum_fig)
 
+bc = 0
+for ii in range(len(ll_check[1])):
+    if ll_check[3][ii] - ll_check[2][ii] > wide_specrange_lim:
+        bc = bc + 1
 
+if bc > 0:
+    plc = -1
+    fig, ax = plt.subplots(bc, 1, figsize=(3*ncols, 2.0*bc))
+    for ii in range(len(lnames)):
+        lname0 = lnames[ii]
+        lbound = left_bounds[ii]
+        rbound = right_bounds[ii]
+        lwidth = rbound - lbound
+        if lwidth > wide_specrange_lim:
+            plc = plc + 1
+        
+            for j in range(len(lnames)):
+                if lnames[j] == lname0:
+                    lbound = fw.rvshift(left_bounds[j], radial_vels[j])
+                    rbound = fw.rvshift(right_bounds[j], radial_vels[j])
+                    the_rv = radial_vels[j]
+            wave, flux, err = data_per_line[ii]
+            resolution = res[ii]
+            linename = names[ii]
+            weight = lweight[ii]
+
+            specwave_rv = fw.rvshift(specwave, the_rv)
+            swave, sflux, serr = fw.parallelcrop(specwave_rv, specflux, 
+                specerr, lbound-extra_AA, rbound+extra_AA)
+
+            if bc > 1:
+                ax[plc].errorbar(swave, sflux, yerr=serr, ls='', fmt='o',
+                    color='C0', alpha=0.5, markersize=3.0)
+                ax[plc].errorbar(wave, flux, yerr=err, ls='', fmt='o',
+                    color='darkblue', markersize=3.0)
+                ax[plc].axhline(1.0, color='black', lw=1.0, zorder=0) 
+                ax[plc].set_title(lname0)
+            else:
+                ax.errorbar(swave, sflux, yerr=serr, ls='', fmt='o',
+                    color='C0', alpha=0.5, markersize=1.0)
+                ax.errorbar(wave, flux, yerr=err, ls='', fmt='o',
+                    color='darkblue', markersize=1.0)
+                ax.axhline(1.0, color='black', lw=1.0, zorder=0) 
+                ax.set_title(lname0)
+
+    plt.suptitle('Spectrum: larger plot for wide spectral regions')
+    fig.tight_layout(rect=[0, 0.03, 1, 0.93])
+    plt.savefig(spectrum_fig2)   
+    pdfs.append(spectrum_fig2)
+        
 print('       >  Plotted spectrum and line selection') 
 
 merger = PdfFileMerger()
@@ -656,13 +938,13 @@ jobscriptlines = ['#!/bin/bash',
 '#SBATCH --job-name=' + run_name,
 '#SBATCH -t ' + hours_str + ':00:00',
 '#SBATCH -N ' + str(int((ctrldct["nind"]+1)/n_cpu_core)),
-'#SBACTH -n ' + str(ctrldct["nind"]+1),
+'#SBATCH -n ' + str(ctrldct["nind"]+1),
 '#SBATCH --no-requeue',
 '',
 'runname=' + run_name,
 'do_restart=' + do_restart,
 'ncpu=' + str(ctrldct["nind"]+1),
-'inidir=' + test_inidir[-1],
+'inidir=' + test_inidir,
 '',
 'echo Run ${runname}',
 'echo Using $ncpu CPUs',
@@ -673,8 +955,8 @@ jobscriptlines = ['#!/bin/bash',
 'module load Python/3.6.6-intel-2018b',
 '',
 '# Define paths',
-'scratch=/scratch-shared/sbrands/${runname}/',
-'homedir=/home/sbrands/pyEA/',
+'scratch=/scratch-shared/' + username + '/${runname}/',
+'homedir=/home/' + username + '/' + codedir + '/',
 '',
 'echo Copying files',
 '',
