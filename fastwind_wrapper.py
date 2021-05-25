@@ -1,5 +1,5 @@
 # Sarah Brands s.a.brands@uva.nl
-# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# This script is part of Kiwi-GA: https://github.com/sarahbrands/Kiwi-GA
 # Connects the evolutionary algorithm to the FASTWIND stellar atmosphere
 # code, i.e. manages and creates FASTWIND input and output
 
@@ -1344,7 +1344,7 @@ def create_FORMAL_INPUT(inidir, line_subset, lfile, create=True):
         if not create:
             return False
         else:
-            print('Exiting pyEA... :-(')
+            print('Exiting Kiwi-GA... :-(')
             sys.exit()
     if not create:
         print('All lines are present in FORMAL_INPUT_master')

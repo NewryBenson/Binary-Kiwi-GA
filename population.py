@@ -1,5 +1,5 @@
 # Sarah Brands s.a.brands@uva.nl
-# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# This script is part of Kiwi-GA: https://github.com/sarahbrands/Kiwi-GA
 # This script contains functions for controlling the evolutionary 
 # algorithm, i.e. population control: reproduction, mutation rate etc.
 # For using the algorithm this has to be combined with a wrapper for 

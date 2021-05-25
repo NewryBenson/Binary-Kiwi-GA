@@ -1,5 +1,5 @@
 # Sarah Brands s.a.brands@uva.nl 25-02-2020
-# Script with some basic checks on pyEA input.
+# Script with some basic checks on Kiwi-GA input.
 #
 # Should be executed before starting a run:
 #  - Checks several aspects of the run setup
@@ -24,11 +24,11 @@ from PyPDF2 import PdfFileMerger
 import fastwind_wrapper as fw
 import population as pop
 
-jobscriptfile = 'run_pyEA.job' # name of job script file 
+jobscriptfile = 'run_kiwiGA.job' # name of job script file 
 hours_str = '72' # maximum wall time 
 n_cpu_core = 24.0 # number of CPUs per node
 username = 'sbrands'
-codedir = 'pyEA'
+codedir = 'Kiwi-GA'
 
 
 # For spectral regions wider than this, an extra wide plot will be made.
@@ -979,12 +979,12 @@ jobscriptlines = ['#!/bin/bash',
 'if [ "$do_restart" == "yes" ]',
 'then',
 '    echo ...restarting run',
-'    srun -n $ncpu python3 pyEA.py ${runname} -c',
+'    srun -n $ncpu python3 kiwiGA.py ${runname} -c',
 'else',
 '    echo ... creating output dir',
 '    mkdir -p output',
 '    echo ... starting run',
-'    srun -n $ncpu python3 pyEA.py ${runname}',
+'    srun -n $ncpu python3 kiwiGA.py ${runname}',
 'fi',
 '',
 'date',

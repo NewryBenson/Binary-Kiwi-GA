@@ -1,5 +1,5 @@
 # Sarah Brands s.a.brands@uva.nl
-# This script is part of pyEA: https://github.com/sarahbrands/pyEA
+# This script is part of Kiwi-GA: https://github.com/sarahbrands/Kiwi-GA
 # This is the main script for the python Evolutionary Algorithm. 
 # It prepares the MPI, reads input files, then either initiates a 
 # run or restarts one. The bulk of the computation is then done by

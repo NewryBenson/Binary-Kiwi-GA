@@ -36,7 +36,7 @@ from astropy.convolution import convolve, Box1DKernel
 import cmocean
 import scipy
 import fastwind_wrapper as fwr
-
+import paths as ppp
 
 ''' ----------------------------------------------------------------------'''
 ''' ----------------------------------------------------------------------'''
@@ -55,8 +55,8 @@ import fastwind_wrapper as fwr
 # The line profiles per model should either be in the 0000_0000.tar.gz archive,
 # or alternatively if already unpacked, the line profiles should be in a folder
 # names 0000_0000 in the parent directory 0000. (example numbers)
-outpath = '/Users/sarah/Dropbox/projects/pyEA_plots/'
-datapath = '/Users/sarah/pyEA/'
+outpath = ppp.outpath_analysis 
+datapath = ppp.datapath_analysis 
 
 ''' ------------------------------------------'''
 '''      which plots do you want to make?     '''
