@@ -2,7 +2,7 @@
 # Sarah Brands
 # s.a.brands@uva.nl
 # Created on: 19-11-2019
-# Latest change: 16-01-2020
+# Latest change: 25-05-2021
 # Probabilty function and read in of parameters from script of Calum Hawcroft
 #    and Michael Abdul-Masih
 # Tested with python 2.7 on Mac
@@ -22,25 +22,20 @@ from matplotlib import colors
 from collections import OrderedDict
 from scipy import stats
 from scipy.optimize import curve_fit
-# import warnings
+import warnings
 
 from PyPDF2 import PdfFileMerger, PdfFileReader
 import cv2 #only required if make_paramspace_avi=True
 import seaborn as sns
 import img2pdf # for saving the scatter plots (fitness vs parameter) in
-                      # PNG and then transforming them to pdf (otherwise they load
-                      # ridiculously slow)
+                      # PNG and then transforming them to pdf (otherwise the
+                      # pdfs load ridiculously slow because of the many
+                      # points in each scatter plot)
 
 from astropy.convolution import convolve, Box1DKernel
 import cmocean
 import scipy
 import fastwind_wrapper as fwr
-
-import warnings
-
-def fxn():
-    """ Function that can be used to (temporarily) suppress warnings """
-    warnings.warn("ignore", RuntimeWarning)
 
 
 ''' ----------------------------------------------------------------------'''
@@ -75,7 +70,7 @@ datapath = '/Users/sarah/pyEA/'
 # 'full' =  all possible plots (will take a while)
 # 'short' = does not generate correlation and fitness plots per line
 # 'manual' = only selected plots, to be specified below
-full_short_manual = 'manual'
+full_short_manual = 'full'
 
 # Verbosity: if True, print progress, if False, print only errors/warnings
 be_verbose = True
@@ -89,11 +84,11 @@ plot_individual_lines = False
 
 if full_short_manual in ('manual'):
     # If full_short_manual is set to 'manual'
-    make_run_summary = False
+    make_run_summary = True
     make_convergence_analysis_plot = False
     make_fitnessdistribution_plot = False
     make_fitnessdistribution_plot_P = False
-    make_fitnessdistribution_plot_fitness = False # is False when fitmeasure = chi2
+    make_fitnessdistribution_plot_fitness = False # False when fitmeasure = chi2
     make_fitnessdistribution_per_line_plot = False
     make_derived_fitness_plots = False
     make_chi2pgen_plot = False
@@ -130,11 +125,14 @@ else:
 
 plotprofs = sys.argv[2]
 if plotprofs in ('plotprofs', 'plot_profs', 'pp', 'prof'):
-    make_lineprofiles_plot = True # Will take a long time depending on how many models are included.
+    # Will take some time depending on how many models are included.
+    make_lineprofiles_plot = True
 else:
-    make_lineprofiles_plot = False # Will take a long time depending on how many models are included.
+    # Will take some time depending on how many models are included.
+    make_lineprofiles_plot = False
 
-make_fitness_fit_analysis_plot = False # Under construction, does not really work yet
+# Under construction, does not really work yet
+make_fitness_fit_analysis_plot = False
 make_param_dist_plot_detail = False
 
 # If you want to only plot the first x (given by newmaxgen) generations
@@ -164,25 +162,24 @@ param_pair_list_avi = [  ['teff', 'logg']
     # the GA output and the .norm data.
     # Specify paths pointing to your spectra
 
-include_extra_spectrum = False #If making lineprofiles plot, include an extra spectrum for comparison?
+#If making lineprofiles plot, include an extra spectrum for comparison
+include_extra_spectrum = False
 
 # Add up to 2 extra spectra or models to the plots
 # If you only want to add one, set the other path equal to ''
 # Currently no error bars are supported as I only loaded cmfgen models
-# extra_spectrum_path1 = '/Users/sarah/Dropbox/projects/radcliffe136a/Ly-a_correction/H35_UV.norm_dat'#/Users/sarah/Dropbox/projects/pyEA_testing/simulate_spectrum/UVopt19may/O2giant/full_specO2giant.txt'
-extra_spectrum_path1 = '/Users/sarah/Dropbox/projects/ga_fitting/optical_pyEA/R136a1/final_spectrum/spectrum.norm'
-# extra_spectrum_path2 = '/Users/sarah/Dropbox/projects/radcliffe136a/data/deKoter1998/scripts/H52_orig.txt'
-extra_spectrum_path2 = ''#/Users/sarah/Dropbox/projects/pyEA_testing/simulate_spectrum/UV_spec_pyEA.txt'#/Absolute/path/to/other/spectrum/here/spectrum-file-without-errors.spec'
+extra_spectrum_path1 = ''
+extra_spectrum_path2 = ''
 
 ''' Specify how to select the models in the lineprofile plots'''
-# Should be set to 'P' if you want it to correspond with the error bars pyGA gives on parameters.
-
 # Choose between:
 # - best_models_cutoff_method = 'P':
 #    model selection based on proper chi square based probabilities
 # - best_models_cutoff_method = 1.05 or other float:
 #    model selection based on the reduced chi squared value (the float)
-#    !!! no proper statistics done !!! Just to artificially show more models #FIXME)
+#    !!! no proper statistics done !!! Just to artificially show more models)
+# Should be set to 'P' if you want it to correspond with the error bars
+#   pyGA gives on parameters.
 best_models_cutoff_method = 'P'
 
 ''' Set number of plots per page '''
@@ -244,11 +241,13 @@ def calculateP(params, nnormspec, chi2, normalize, be_verbose=False):
     if normalize:
         scaling = np.min(chi2)
         if be_verbose:
-            do_print('Scaling Chi2, dividing by: ' + str(round(scaling, 3)), be_verbose)
+            do_print('Scaling Chi2, dividing by: ' + str(round(scaling, 3)),
+                be_verbose)
     else:
         scaling = degreesFreedom
         if be_verbose:
-            do_print('Not scaling Chi2, dividing by: ' + str(round(scaling, 3)), be_verbose)
+            do_print('Not scaling Chi2, dividing by: ' + str(round(scaling, 3)),
+                be_verbose)
     chi2 = (chi2 * degreesFreedom) / scaling
     probs = np.zeros_like(chi2)
     try:
@@ -287,8 +286,6 @@ def cm_rgba(x):
     setcmap = cm.jet
     setnorm = colors.Normalize(0.0, 1.0)
 
-    # setcmap = cm.viridis_r
-    # setnorm = colors.Normalize(-0.1, 1.0)
     setscalarMap = cm.ScalarMappable(norm=setnorm, cmap=setcmap)
     return setscalarMap.to_rgba(x)
 
@@ -344,11 +341,14 @@ best_fit_pars_txt = plotpath + name_best_fit_params_file
 #     if line.endswith(" \n"):
 #        line = line.replace(' \n', '\n')
 
-variable_names, variable_vals, fixed_names, fixed_vals = fwr.read_paramspace(theparamfile)
-defnames, defvals = fwr.get_defvals(thefwdefaultfile, variable_names, fixed_names)
+parout = fwr.read_paramspace(theparamfile)
+variable_names, variable_vals, fixed_names, fixed_vals = parout
+defnames, defvals = fwr.get_defvals(thefwdefaultfile,
+    variable_names, fixed_names)
 
 var_dct = dict(zip(variable_names, variable_vals))
-fix_dct = dict(zip(np.concatenate((fixed_names, defnames)), np.concatenate((fixed_vals, defvals))))
+fix_dct = dict(zip(np.concatenate((fixed_names, defnames)),
+    np.concatenate((fixed_vals, defvals))))
 
 x = pd.read_csv(thechi2file, sep=' ')
 for acolname in x.columns:
@@ -372,7 +372,7 @@ if not 'radius' in x.columns:
 else:
     no_radius_provided = False
     if be_verbose:
-        print('Radius provided: computing derived parameters such as luminosity')
+        print('Radius provided: computing derived parameters e.g. luminosity')
 if not 'xlum' in x.columns:
     no_xlum_provided = True
     if be_verbose:
@@ -492,7 +492,8 @@ for i in range(len(line_norm_starts)):
 
 do_print('best fitness : ' + str(max(x['fitness'])), be_verbose)
 do_print('best chi2    : ' + str(min(x['chi2'])), be_verbose)
-do_print('best red_chi2: ' + str(min(x['chi2'])/(specpoints - len(params))), be_verbose)
+do_print('best red_chi2: ' + str(min(x['chi2'])/(specpoints - len(params))),
+    be_verbose)
 probabilities = calculateP(params, specpoints, x['chi2'], True)
 x = x.assign(P=probabilities)
 
@@ -510,8 +511,10 @@ ind_2sig = x['P'] > min_p_2sig
 
 for i in params:
     params_dic[i[0]] = [float(i[1]), float(i[2])]
-    params_error_1sig[i[0]] = [min(x[i[0]][ind_1sig]), max(x[i[0]][ind_1sig]), x[i[0]][best]]
-    params_error_2sig[i[0]] = [min(x[i[0]][ind_2sig]), max(x[i[0]][ind_2sig]), x[i[0]][best]]
+    params_error_1sig[i[0]] = [min(x[i[0]][ind_1sig]),
+        max(x[i[0]][ind_1sig]), x[i[0]][best]]
+    params_error_2sig[i[0]] = [min(x[i[0]][ind_2sig]),
+        max(x[i[0]][ind_2sig]), x[i[0]][best]]
 
 params_error = params_error_2sig
 
@@ -574,13 +577,15 @@ if best_models_cutoff_method == 'Mokiem':
     histvals = histvals[0]
     upper_histmids = histmids[int(len(histmids)/2):]
     upper_histvals = histvals[int(len(histvals)/2):]
-    popt, pcov = curve_fit(skew_gauss, upper_histmids, upper_histvals, p0 = [200, 0.85, 0.1, 0.1 ,0])
+    popt, pcov = curve_fit(skew_gauss, upper_histmids, upper_histvals,
+        p0 = [200, 0.85, 0.1, 0.1 ,0])
 
     histmids_hires = np.linspace(min(upper_histmids), max(upper_histmids), 1000)
     skewgaussfit_histvals = skew_gauss(histmids_hires, *popt)
     peak_val = histmids_hires[np.argmax(skewgaussfit_histvals)]
 
-    print('Mokiem errors: Peak val = ' + str(round(peak_val,3)) + ' (maxgen = ' + str(maxgen) + ')')
+    print('Mokiem errors: Peak val = ' + str(round(peak_val,3)) +
+        ' (maxgen = ' + str(maxgen) + ')')
 
     fig, ax = plt.subplots(1, 1, figsize=(15, 2.5))
     ax.set_title('Fitness distribution (#models)')
@@ -599,8 +604,8 @@ if best_models_cutoff_method == 'Mokiem':
     ind_mokiem = x['fitness_norm'] > peak_val
 
     for i in params:
-        # params_dic[i[0]] = [float(i[1]), float(i[2])]
-        params_error_Mokiem[i[0]] = [min(x[i[0]][ind_mokiem]), max(x[i[0]][ind_mokiem]), x[i[0]][best_mokiem]]
+        params_error_Mokiem[i[0]] = [min(x[i[0]][ind_mokiem]),
+            max(x[i[0]][ind_mokiem]), x[i[0]][best_mokiem]]
 
     params_error = params_error_Mokiem
 
@@ -618,9 +623,11 @@ if make_lineprofiles_plot and include_extra_spectrum:
         try:
             cmfgenwave1, cmfgenflux1 = np.genfromtxt(extra_spectrum_path1).T
         except:
-            cmfgenwave1, cmfgenflux1, cmfgenerror1 = np.genfromtxt(extra_spectrum_path1).T
+            cmfout = np.genfromtxt(extra_spectrum_path1).T
+            cmfgenwave1, cmfgenflux1, cmfgenerror1 = cmfout
     else:
-        do_print("Cannot plot extra spectra, file not found: " + extra_spectrum_path1, True)
+        do_print("Cannot plot extra spectra, file not found: " +
+            extra_spectrum_path1, True)
 
     if extra_spectrum_path2 == '':
         pass
@@ -628,11 +635,13 @@ if make_lineprofiles_plot and include_extra_spectrum:
         try:
             cmfgenwave2, cmfgenflux2 = np.genfromtxt(extra_spectrum_path2).T
         except:
-            cmfgenwave2, cmfgenflux2, cmfgenerror2 = np.genfromtxt(extra_spectrum_path2).T
+             cmfout2 = np.genfromtxt(extra_spectrum_path2).T
+             cmfgenwave2, cmfgenflux2, cmfgenerror2 = cmfout2
     else:
-        do_print("Cannot plot extra spectra, file not found: " + extra_spectrum_path2, True)
+        do_print("Cannot plot extra spectra, file not found: " +
+            extra_spectrum_path2, True)
 
-''' Absolutely ridiculous workaround to get a legend on the param vs fitness plots '''
+''' Absolutely ridiculous workaround to get a legend'''
 # Namely here I create a pdf that contains the colorbar,
 # and then later I import the image of that colorbar into the figure
 
@@ -644,12 +653,12 @@ img = plt.imshow(a, cmap="jet")
 plt.gca().set_visible(False)
 cax = plt.axes([0.05, 0.3, 0.9, 0.1])#[0.3, 0.3, 0.8, 0.8])
 cbar = plt.colorbar(cax=cax, orientation='horizontal', ticks=np.linspace(0,1,5))
-cbar.ax.set_xticklabels(['0', str(int(0.25*float(maxgenid))), str(int(0.5*float(maxgenid))), str(int(0.75*float(maxgenid))), str(int(float(maxgenid)))],
-    fontsize=30)
+cbar.ax.set_xticklabels(['0', str(int(0.25*float(maxgenid))),
+    str(int(0.5*float(maxgenid))), str(int(0.75*float(maxgenid))),
+    str(int(float(maxgenid)))], fontsize=30)
 cbar.ax.set_xlabel('Generation',fontsize=30)
 plt.savefig(colorbar_jet_legend, dpi=300)
 plt.close()
-
 
 
 ''' ----------------------------------------------------------------------'''
@@ -763,16 +772,11 @@ if (make_derived_fitness_plots or make_run_summary) and not no_radius_provided:
             x['dmom_clump'] = get_logmodwindmom(x['mdot'], x['radius'],
                 x['vinf'], x['fclump'])
             derived_parameters.append('dmom_clump')
-    # if 'fvel' in var_dct.keys():
-    #     derived_parameters.append('fvor')
-    #     x['fvor'] = x['fvel']/(1.-x['fvel'])
 
-    # import warnings
-    # warnings.filterwarnings('ignore')
     if not no_xlum_provided:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            fxn()
+            warnings.warn("ignore", RuntimeWarning)
             if 'fx' in fix_dct.keys():
                 x['logxlum'] = np.log10(x['xlum'])
                 derived_parameters.append('logxlum')
@@ -782,32 +786,28 @@ if (make_derived_fitness_plots or make_run_summary) and not no_radius_provided:
                         if 'vinf' in var_dct.keys():
                             x['logfx'] = get_fx(x['mdot'], x['vinf'])
                         elif 'vinf' in fix_dct.keys():
-                            x['logfx'] = get_fx(x['mdot'], np.ones(len(x['mdot']))*float(fix_dct['vinf']))
-                            # print x['mdot']
-                            # print np.ones(len(x['mdot']))*float(fix_dct['vinf'])
+                            x['logfx'] = get_fx(x['mdot'],
+                                np.ones(len(x['mdot']))*float(fix_dct['vinf']))
                         else:
                             x['logfx'] = get_fx(x['mdot'], x['vesc']*2.6)
             else:
                 x['logfx'] = float(fix_dct['fx'])*np.ones(len(x))
-    # warnings.filterwarnings('default')
     if 'logfclump' in var_dct.keys():
         derived_parameters.append('fclump')
         x['fclump'] = 10**x['logfclump']
-    # if 'fclump' in var_dct.keys():
-    #     derived_parameters.append('logfclump')
-    #     x['logfclump'] = np.log10(x['fclump'])
+
 
     # Get the best values and error margins on the derived parameters
     derivedparams_dic = OrderedDict()
     derivedpar_error1sig_dic = OrderedDict()
     derivedpar_error2sig_dic = OrderedDict()
     for i in derived_parameters:
-        derivedparams_dic[i] = [min(x[derived_parameters]),
-            max(x[derived_parameters])]
-        derivedpar_error1sig_dic[i] = [min(x[i][ind_1sig]),
-            max(x[i][ind_1sig]), x[i][best]]
-        derivedpar_error2sig_dic[i] = [min(x[i][ind_2sig]),
-            max(x[i][ind_2sig]), x[i][best]]
+        derivedparams_dic[i] = [np.nanmin(x[derived_parameters]),
+            np.nanmax(x[derived_parameters])]
+        derivedpar_error1sig_dic[i] = [np.nanmin(x[i][ind_1sig]),
+            np.nanmax(x[i][ind_1sig]), x[i][best]]
+        derivedpar_error2sig_dic[i] = [np.nanmin(x[i][ind_2sig]),
+            np.nanmax(x[i][ind_2sig]), x[i][best]]
 
     x['invchi']= 1./x['rchi2']
 
@@ -831,8 +831,8 @@ if make_derived_fitness_plots and not no_radius_provided:
                 lp = lp + 1 # Next parameter is plotted
                 if lp < len(derived_parameters):
                     derpar = derived_parameters[lp]
-                    ax[arow,acol].scatter(x[derpar], x[fitmeasure], s=12, edgecolors='none',
-                        color='darkblue', alpha=1.0)
+                    ax[arow,acol].scatter(x[derpar], x[fitmeasure],
+                        s=12, edgecolors='none', color='darkblue', alpha=1.0)
                     ax[arow,acol].axvspan(derivedpar_error1sig_dic[derpar][0],
                         derivedpar_error1sig_dic[derpar][1], color='gold',
                         alpha=0.6, zorder=0)
@@ -848,7 +848,8 @@ if make_derived_fitness_plots and not no_radius_provided:
                 else:
                     ax[arow,acol].axis('off')
 
-        fig.suptitle('Derived parameters (' + str(max(x['gen'])) + ' generations) ')
+        fig.suptitle('Derived parameters (' + str(max(x['gen']))
+            + ' generations) ')
         fig.tight_layout(rect=[0, 0.01, 1, 0.97])
         derivedpar_jpgname = 'derived_tmp' + runname + '.jpg'
         plt.savefig(derivedpar_jpgname, dpi=400)
@@ -937,8 +938,6 @@ if make_run_summary:
             transform=ax[0].transAxes, fontsize=fz_err, va='top')
         ax[0].text(0.60, 1.-base-lp*ew*pls, strrange_1sig,
             transform=ax[0].transAxes, fontsize=fz_err, va='top')
-        # ax[0].text(0.54, 1.-base-lp*ew*pls, r'$1\sigma$',
-        #     transform=ax[0].transAxes, fontsize=fz_err, va='top', alpha=0.6)
 
         ax[0].text(0.37, (1.-base2-lp*ew*pls)+hpls - 0.5*pls, '+',
             transform=ax[0].transAxes, fontsize=fz_err, va='top')
@@ -950,8 +949,6 @@ if make_run_summary:
             transform=ax[0].transAxes, fontsize=fz_err, va='top')
         ax[0].text(0.60, 1.-base2-lp*ew*pls - 0.5*pls, strrange,
             transform=ax[0].transAxes, fontsize=fz_err, va='top')
-        # ax[0].text(0.54, 1.-base2-lp*ew*pls - 0.5*pls, r'$2\sigma$',
-        #     transform=ax[0].transAxes, fontsize=fz_err, va='top', alpha=0.6)
 
         bestparstr = (strpname.ljust(cwtxt) + strbestp.ljust(cwtxt) +
             strdiffplus_1sig.ljust(cwtxt) + strdiffmin_1sig.ljust(cwtxt) +
@@ -981,8 +978,10 @@ if make_run_summary:
     run_info_data.append(str(round(min(x['rchi2']),5)))
 
     for i in xrange(len(run_info_data)):
-        ax[1].text(0.05, 1.-pls-i*ew*pls*0.5+base, run_info_labels[i], transform=ax[1].transAxes, fontsize=fz, va='top')
-        ax[1].text(0.55, 1.-pls-i*ew*pls*0.5+base, run_info_data[i], transform=ax[1].transAxes, fontsize=fz, va='top')
+        ax[1].text(0.05, 1.-pls-i*ew*pls*0.5+base, run_info_labels[i],
+            transform=ax[1].transAxes, fontsize=fz, va='top')
+        ax[1].text(0.55, 1.-pls-i*ew*pls*0.5+base, run_info_data[i],
+            transform=ax[1].transAxes, fontsize=fz, va='top')
 
     if not no_radius_provided:
 
@@ -994,7 +993,8 @@ if make_run_summary:
                 numround_tmp = 0
             else:
                 numround_tmp = numround
-            strbestp = str(round(derivedpar_error2sig_dic[strpname][2],numround_tmp))
+            strbestp = str(round(derivedpar_error2sig_dic[strpname][2],
+                numround_tmp))
             strdiffmin = str(round(derivedpar_error2sig_dic[strpname][2] -
                 derivedpar_error2sig_dic[strpname][0],numround_tmp))
             strdiffplus =  str(round(derivedpar_error2sig_dic[strpname][1] -
@@ -1003,10 +1003,14 @@ if make_run_summary:
                 derivedpar_error1sig_dic[strpname][0],numround_tmp))
             strdiffplus_1sig =  str(round(derivedpar_error1sig_dic[strpname][1] -
                 derivedpar_error1sig_dic[strpname][2],numround_tmp))
-            strrange = ('[' + str(round(derivedpar_error2sig_dic[strpname][0],numround_tmp)) + ', '
-                +  str(round(derivedpar_error2sig_dic[strpname][1],numround_tmp)) + ']')
-            strrange_1sig = ('[' + str(round(derivedpar_error1sig_dic[strpname][0],numround_tmp)) + ', '
-                +  str(round(derivedpar_error1sig_dic[strpname][1],numround_tmp)) + ']')
+            strrange = ('[' + str(round(derivedpar_error2sig_dic[strpname][0],
+                numround_tmp)) + ', '
+                +  str(round(derivedpar_error2sig_dic[strpname][1],
+                    numround_tmp)) + ']')
+            strrange_1sig = ('[' + str(round(derivedpar_error1sig_dic[strpname][0],
+                numround_tmp)) + ', '
+                +  str(round(derivedpar_error1sig_dic[strpname][1],
+                    numround_tmp)) + ']')
 
             ax[1].text(0.05, 0.71-base-lp*ew*pls, strpname,
                 transform=ax[1].transAxes, fontsize=fz, va='top')
@@ -1024,8 +1028,6 @@ if make_run_summary:
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
             ax[1].text(0.70, 0.71-base-lp*ew*pls, strrange_1sig,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            # ax[1].text(0.54, 1.-base-lp*ew*pls, r'$1\sigma$',
-            #     transform=ax[1].transAxes, fontsize=fz_err, va='top', alpha=0.6)
 
             ax[1].text(0.52, (0.71-base2-lp*ew*pls)+hpls - 0.5*pls, '+',
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
@@ -1037,8 +1039,6 @@ if make_run_summary:
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
             ax[1].text(0.70, 0.71-base2-lp*ew*pls - 0.5*pls, strrange,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            # ax[0].text(0.54, 1.-base2-lp*ew*pls - 0.5*pls, r'$2\sigma$',
-            #     transform=ax[0].transAxes, fontsize=fz_err, va='top', alpha=0.6)
 
             bestparstr = (strpname.ljust(cwtxt) + strbestp.ljust(cwtxt) +
                 strdiffplus_1sig.ljust(cwtxt) + strdiffmin_1sig.ljust(cwtxt) +
@@ -1118,7 +1118,8 @@ if make_convergence_analysis_plot:
             error_vals_2s_up[i].append(max(x_utg[p[0]][ind_2sig_utg]))
             error_vals_best[i].append(x_utg[p[0]][best_utg])
         if agen % 25 == 0:
-            do_print('Calculating convergence ' + str(agen) + '/' + str(len(xgen_utg)), be_verbose)
+            do_print('Calculating convergence ' + str(agen) + '/'
+                + str(len(xgen_utg)), be_verbose)
 
     # --------
     # PLOTTING
@@ -1152,7 +1153,8 @@ if make_convergence_analysis_plot:
     line_pdf_names = []
     paramcount = 0
     for npage in range(npages):
-        fig, ax = plt.subplots(v_param_pp,1, figsize=(colwidth,rowwidth), sharex=False)
+        fig, ax = plt.subplots(v_param_pp,1, figsize=(colwidth,rowwidth),
+            sharex=False)
         make_legend = True
         for i in range(v_param_pp):
 
@@ -1171,26 +1173,25 @@ if make_convergence_analysis_plot:
                 save_conv_parnames.append(p[0])
                 if make_legend:
                     ax[i].fill_between(xgen_utg, error_vals_2s_low[paramcount-1],
-                        error_vals_2s_up[paramcount-1], color='#fed976', alpha=0.8,
-                        label=r'$2\sigma$')
+                        error_vals_2s_up[paramcount-1], color='#fed976',
+                        alpha=0.8, label=r'$2\sigma$')
                     ax[i].fill_between(xgen_utg, error_vals_1s_low[paramcount-1],
-                        error_vals_1s_up[paramcount-1], color='#fc4e2a', alpha=0.5,
-                        label=r'$1\sigma$')
+                        error_vals_1s_up[paramcount-1], color='#fc4e2a',
+                        alpha=0.5, label=r'$1\sigma$')
                     ax[i].plot(xgen_utg, error_vals_best[paramcount-1],
                         color='#bd0026', lw=2, label='best fit')
                     make_legend = False
                 else:
                     ax[i].fill_between(xgen_utg, error_vals_2s_low[paramcount-1],
-                        error_vals_2s_up[paramcount-1], color='#fed976', alpha=0.8)
+                        error_vals_2s_up[paramcount-1], color='#fed976',
+                        alpha=0.8)
                     ax[i].fill_between(xgen_utg, error_vals_1s_low[paramcount-1],
-                        error_vals_1s_up[paramcount-1], color='#fc4e2a', alpha=0.5)
+                        error_vals_1s_up[paramcount-1], color='#fc4e2a',
+                        alpha=0.5)
                     ax[i].plot(xgen_utg, error_vals_best[paramcount-1],
                         color='#bd0026', lw=2)
                 ax[i].set_ylim(float(p[1]), float(p[2]))
                 ax[i].set_ylabel(p[0])
-                # labels = ax[i].get_yticklabels()
-                # labels[0] = ""
-                # ax[i].set_yticklabels(labels)
             else:
                 ax[i].axis('off')
 
@@ -1214,7 +1215,8 @@ if make_convergence_analysis_plot:
         line_pdf_names.append(pdfname_tmp)
         plt.savefig(pdfname_tmp)
         plt.close()
-        do_print("Convergence plots: saved page " + str(int(npage+1)) + " out of " + str(int(npages)) + " pages.", be_verbose)
+        do_print("Convergence plots: saved page " + str(int(npage+1))
+            + " out of " + str(int(npages)) + " pages.", be_verbose)
 
     # Merge all line profile plot pages into one document.
     if os.path.isfile(plotpath + name_convergence_plot):
@@ -1230,7 +1232,8 @@ if make_convergence_analysis_plot:
 
     # Save the convergence for each parameter to a text file
     for i in range(len(save_conv_parnames)):
-        np.savetxt(datapath + 'convergence_' + save_conv_parnames[i] + '.txt', save_convergence[i])
+        np.savetxt(datapath + 'convergence_' + save_conv_parnames[i] +
+            '.txt', save_convergence[i])
 
 ''' ---------------------------------------'''
 '''    Fit fitness distribution            '''
@@ -1274,7 +1277,8 @@ def fit_top_distr(all_x, x_data, y_data, mp, f_err=0.70, dlim=0.001,
     error_noise = np.ones(len(param_maxy))
     while maxdiff > dlim:
         popt, pcov = scipy.optimize.curve_fit(fitpoly_simple, param_x,
-            param_maxy, sigma=error_noise,p0=[mp, mp, mp, mp, mp, 0, 0, 0, 0, 0, 0])
+            param_maxy, sigma=error_noise,p0=[mp, mp, mp, mp, mp,
+                0, 0, 0, 0, 0, 0])
         currentbestfit = fitpoly_simple(param_x, *popt)
         diff = param_maxy - currentbestfit
         hargs = np.argwhere(diff > 0)
@@ -1293,7 +1297,7 @@ def fit_top_distr(all_x, x_data, y_data, mp, f_err=0.70, dlim=0.001,
 
     return plotybestfit
 
-if make_fitness_fit_analysis_plot:# or full_short_manual in ('short', 'full'):
+if make_fitness_fit_analysis_plot:
 
     error_vals_1s_low = []
     error_vals_1s_up = []
@@ -1340,7 +1344,8 @@ if make_fitness_fit_analysis_plot:# or full_short_manual in ('short', 'full'):
             par_xrange = np.linspace(par_min, par_max, par_nbins)
 
             par_bestfit = fit_top_distr(par_xrange, x_utg[par_name].values,
-                x_utg['P'].values, bestval, f_err=0.95, dlim=0.001, be_verbose=True)
+                x_utg['P'].values, bestval, f_err=0.95, dlim=0.001,
+                    be_verbose=True)
             fig, ax = plt.subplots()
             ax.plot(par_xrange, par_bestfit)
             ax.plot(x_utg[par_name], x_utg['P'], ls='', marker='o')
@@ -1355,7 +1360,8 @@ if make_fitness_fit_analysis_plot:# or full_short_manual in ('short', 'full'):
             error_vals_2s_up[i].append(max(x_utg[p[0]][ind_2sig_utg]))
             error_vals_best[i].append(x_utg[p[0]][best_utg])
         if agen % 25 == 0:
-            do_print('Calculating convergence ' + str(agen) + '/' + str(len(xgen_utg)), be_verbose)
+            do_print('Calculating convergence ' + str(agen) + '/' +
+                str(len(xgen_utg)), be_verbose)
 
 ''' ---------------------------------------------------------------'''
 '''     Make distribution violin plots as function of generation   '''
@@ -1389,13 +1395,15 @@ if make_param_dist_plot or make_param_dist_plot_detail:
     rowwidth = plotscalefactor*1.41
     colwidth = plotscalefactor
 
-    do_print('Start making the violin parameter distribution plots ...', be_verbose)
+    do_print('Start making the violin parameter distribution plots ...',
+        be_verbose)
 
     line_pdf_names = []
     if make_param_dist_plot:
         paramcount = 0
         for npage in range(npages):
-            fig, ax = plt.subplots(v_param_pp,1, figsize=(colwidth,rowwidth), sharex=False)
+            fig, ax = plt.subplots(v_param_pp,1, figsize=(colwidth,rowwidth),
+                sharex=False)
 
             for i in range(v_param_pp):
 
@@ -1404,15 +1412,18 @@ if make_param_dist_plot or make_param_dist_plot_detail:
 
                 paramcount = paramcount + 1
                 if paramcount <= nparams:
-                    sns.violinplot( x=x['gen_id'], y=x[param_keys[v_param_pp*npage+i]],
-                    linewidth=0.1, scale='width', ax=ax[i], cut=0, palette="Blues")
+                    sns.violinplot( x=x['gen_id'],
+                    y=x[param_keys[v_param_pp*npage+i]],
+                    linewidth=0.1, scale='width', ax=ax[i], cut=0,
+                    palette="Blues")
                 elif paramcount == nparams + 1:
                     thechi2min = np.nanmin(x['chi2'].values)
                     chi2bound = thechi2min*10
                     chi2crop =  x.loc[x['chi2'] < 999999999]
                     chi2crop =  chi2crop['chi2'].loc[chi2crop['rchi2'] < 1000.0].values
                     sns.violinplot( x=x['gen_id'], y=chi2crop,
-                    linewidth=0.1, scale='width', ax=ax[i], cut=0, palette="husl")
+                    linewidth=0.1, scale='width', ax=ax[i],
+                        cut=0, palette="husl")
                     ax[i].set_ylabel('chi2')
                     ax[i].set_ylim(thechi2min, chi2bound)
                 else:
@@ -1436,7 +1447,9 @@ if make_param_dist_plot or make_param_dist_plot_detail:
             line_pdf_names.append(pdfname_tmp)
             plt.savefig(pdfname_tmp)
             plt.close()
-            do_print("Parameter distribution (violinplot): saved page " + str(int(npage+1)) + " out of " + str(int(npages)) + " pages.", be_verbose)
+            do_print("Parameter distribution (violinplot): saved page "
+                + str(int(npage+1)) + " out of " + str(int(npages)) + " pages.",
+                be_verbose)
 
     # Merge all line profile plot pages into one document.
     if os.path.isfile(plotpath + name_param_dist_plot):
@@ -1461,12 +1474,14 @@ if make_param_dist_plot or make_param_dist_plot_detail:
 
             paramcount = 0
             for npage in range(npages):
-                fig, ax = plt.subplots(v_param_pp,1, figsize=(colwidth,rowwidth), sharex=True)
+                fig, ax = plt.subplots(v_param_pp,1, figsize=(colwidth,rowwidth),
+                    sharex=True)
 
                 for i in range(v_param_pp):
                     paramcount = paramcount + 1
                     if paramcount <= nparams:
-                        sns.violinplot( x=x_subpage['gen_id'], y=x_subpage[param_keys[v_param_pp*npage+i]],
+                        sns.violinplot( x=x_subpage['gen_id'],
+                        y=x_subpage[param_keys[v_param_pp*npage+i]],
                         linewidth=0.1, scale='width', ax=ax[i], cut=0)
                     else:
                         ax[i].axis('off')
@@ -1490,11 +1505,15 @@ if make_param_dist_plot or make_param_dist_plot_detail:
                 fig.subplots_adjust(wspace=0, hspace=0)
 
                 # Saving page in pdf. Pdfs will be sticked later.
-                pdfname_tmp = plotpath + 'param_dist_zoom_p' + str(int(npage)) + '_' + str(int(nsubpage)) + '.pdf'
+                pdfname_tmp = (plotpath + 'param_dist_zoom_p' + str(int(npage))
+                    + '_' + str(int(nsubpage)) + '.pdf')
                 line_pdf_names.append(pdfname_tmp)
                 plt.savefig(pdfname_tmp)
                 plt.close()
-                do_print("Parameter distribution (violinplot): saved page " + str(int(npage+1)) + " subpage " + str(int(nsubpage+1)) + " out of " + str(int(1.0*npages*nsubpages)) + " pages.", be_verbose)
+                do_print("Parameter distribution (violinplot): saved page " +
+                    str(int(npage+1)) + " subpage " + str(int(nsubpage+1)) +
+                    " out of " + str(int(1.0*npages*nsubpages)) + " pages.",
+                    be_verbose)
 
     # Merge all line profile plot pages into one document.
     if os.path.isfile(plotpath + name_param_dist_zoom_plot):
@@ -1510,20 +1529,24 @@ if make_param_dist_plot or make_param_dist_plot_detail:
 
 if maxgen > 1:
     if make_chi2pgen_plot:
-        do_print("Making chi2 as a function of generation plots ...", be_verbose)
+        do_print("Making chi2 as a function of generation plots ...",
+            be_verbose)
 
         pdfs_chi2pgen = []
 
         mingen = 3500 # very large number means: don't make a zoomed plot
         last_X_generations = int(float(maxgenid)-mingen)
-        generation_crop, mutation_crop = parallelcrop(generation, mutation, float(mingen), float(maxgenid))
+        generation_crop, mutation_crop = parallelcrop(generation, mutation,
+            float(mingen), float(maxgenid))
 
         plotscalefactor = 12.0
         if last_X_generations > 0 and maxgenid > last_X_generations + 10:
-            fig, ax = plt.subplots(6,1, figsize=(plotscalefactor*1,plotscalefactor*1.41))
+            fig, ax = plt.subplots(6,1,
+                figsize=(plotscalefactor*1,plotscalefactor*1.41))
             make_zoom = True
         else:
-            fig, ax = plt.subplots(3,1, figsize=(plotscalefactor*1,plotscalefactor*1.41))
+            fig, ax = plt.subplots(3,1,
+                figsize=(plotscalefactor*1,plotscalefactor*1.41))
             make_zoom = False
 
         C0blue = (31./255, 119./255, 180./255)
@@ -1538,23 +1561,30 @@ if maxgen > 1:
         ax_2 = ax[2].twinx()
         ax_2.plot(generation, mutation, color=C1orange, label='mutation rate')
 
-        # after 35 generations we expect the solution to have more or less converged
-        # so if there are more than 45 generations carried out, we also make a zoomed
-        # plot of the chi2 behavior
+        # After 35 generations we expect the solution to be converged
+        # so if there are more than 45 generations carried out, we also make
+        # a zoomed plot of the chi2 behavior
         if make_zoom:
-            xaxisvalue = np.linspace(mingen+1, float(maxgenid), (float(maxgenid)-mingen))
-            ax[3].plot(xaxisvalue, median_chi2_per_gen[-last_X_generations:], label=r'median $\chi^2$', color=C0blue)
-            ax[4].plot(xaxisvalue, mean_chi2_per_gen[-last_X_generations:], label=r'mean $\chi^2$', color=C0blue)
-            ax[5].plot(xaxisvalue, lowest_chi2_per_gen[-last_X_generations:], label=r'lowest $\chi^2$', color=C0blue)
+            xaxisvalue = np.linspace(mingen+1, float(maxgenid),
+                (float(maxgenid)-mingen))
+            ax[3].plot(xaxisvalue, median_chi2_per_gen[-last_X_generations:],
+                label=r'median $\chi^2$', color=C0blue)
+            ax[4].plot(xaxisvalue, mean_chi2_per_gen[-last_X_generations:],
+                label=r'mean $\chi^2$', color=C0blue)
+            ax[5].plot(xaxisvalue, lowest_chi2_per_gen[-last_X_generations:],
+                label=r'lowest $\chi^2$', color=C0blue)
             vspanvalues0_y = ax[3].get_ylim()
             vspanvalues1_y = ax[4].get_ylim()
             vspanvalues2_y = ax[5].get_ylim()
             ax_3 = ax[3].twinx()
-            ax_3.plot(generation_crop, mutation_crop, color=C1orange, label='mutation rate')
+            ax_3.plot(generation_crop, mutation_crop, color=C1orange,
+                label='mutation rate')
             ax_4 = ax[4].twinx()
-            ax_4.plot(generation_crop, mutation_crop, color=C1orange, label='mutation rate')
+            ax_4.plot(generation_crop, mutation_crop, color=C1orange,
+                label='mutation rate')
             ax_5 = ax[5].twinx()
-            ax_5.plot(generation_crop, mutation_crop, color=C1orange, label='mutation rate')
+            ax_5.plot(generation_crop, mutation_crop, color=C1orange,
+                label='mutation rate')
             ax[3].set_ylabel(r'median $\chi^2$')
             ax[4].set_ylabel(r'mean $\chi^2$ p')
             ax[5].set_ylabel(r'lowest $\chi^2$')
@@ -1564,9 +1594,12 @@ if maxgen > 1:
             ax[3].axvspan(mingen, maxgenid, alpha=0.2, color='yellow')
             ax[4].axvspan(mingen, maxgenid, alpha=0.2, color='yellow')
             ax[5].axvspan(mingen, maxgenid, alpha=0.2, color='yellow')
-            ax[3].set_title(r'median $\chi^2$ per generation (last ' + str(int(last_X_generations)) + ' generations)')
-            ax[4].set_title(r'mean $\chi^2$ per generation (last ' + str(int(last_X_generations)) + ' generations)')
-            ax[5].set_title(r'lowest $\chi^2$ per generation (last ' + str(int(last_X_generations)) + ' generations)')
+            ax[3].set_title(r'median $\chi^2$ per generation (last ' +
+                str(int(last_X_generations)) + ' generations)')
+            ax[4].set_title(r'mean $\chi^2$ per generation (last ' +
+                str(int(last_X_generations)) + ' generations)')
+            ax[5].set_title(r'lowest $\chi^2$ per generation (last ' +
+                str(int(last_X_generations)) + ' generations)')
             ax[3].set_xlabel('Generation')
             ax[4].set_xlabel('Generation')
             ax[5].set_xlabel('Generation')
@@ -1576,8 +1609,11 @@ if maxgen > 1:
             ax_3.legend(loc='upper right')
             ax_4.legend(loc='upper right')
             ax_5.legend(loc='upper right')
-            plt.tight_layout(rect=[0.0,0.5,.7,1.0]) # rect adds extra whitespace so the size of these plots
-                                                    # is more balanced with respect to the lineprofile plots etc.
+
+            # rect adds extra whitespace so the size of these plots
+            # is more balanced with respect to the lineprofile plots etc.
+            plt.tight_layout(rect=[0.0,0.5,.7,1.0])
+
 
         ax[0].set_ylabel(r'median $\chi^2$')
         ax[1].set_ylabel(r'mean $\chi^2$ p')
@@ -1604,13 +1640,13 @@ if maxgen > 1:
             ax[2].axvspan(mingen, maxgenid, alpha=0.2, color='yellow')
 
         if not make_zoom:
-            plt.tight_layout(rect=[0.0,0.5,.7,1.0])# rect adds extra whitespace so the size of these plots
-                                                    # is more balanced with respect to the lineprofile plots etc.
+            # rect adds extra whitespace so the size of these plots
+            # is more balanced with respect to the lineprofile plots etc.
+            plt.tight_layout(rect=[0.0,0.5,.7,1.0])
             plt.savefig(plotpath + name_chi2pergen_plot)
             plt.close()
 
         if make_zoom:
-            # plt.tight_layout(rect=[0.0,0.0,0.7,1.0])
             plt.savefig(plotpath + name_chi2pergen_plot)
             plt.close()
 
@@ -1619,13 +1655,17 @@ if maxgen > 1:
 ''' ------------------------------------------'''
 if make_fitnessdistribution_plot:
 
-    if make_fitnessdistribution_plot and make_fitnessdistribution_plot_P and make_fitnessdistribution_plot_fitness:
+    if (make_fitnessdistribution_plot and make_fitnessdistribution_plot_P
+        and make_fitnessdistribution_plot_fitness):
         plotvalues = ['invchi', 'P', 'fitness']
-    elif make_fitnessdistribution_plot_P and make_fitnessdistribution_plot_fitness:
+    elif (make_fitnessdistribution_plot_P and
+        make_fitnessdistribution_plot_fitness):
         plotvalues = ['P', 'fitness']
-    elif make_fitnessdistribution_plot and make_fitnessdistribution_plot_P:
+    elif (make_fitnessdistribution_plot and
+        make_fitnessdistribution_plot_P):
         plotvalues = ['invchi', 'P']
-    elif make_fitnessdistribution_plot and make_fitnessdistribution_plot_fitness:
+    elif (make_fitnessdistribution_plot and
+        make_fitnessdistribution_plot_fitness):
         plotvalues = ['invchi', 'fitness']
     elif make_fitnessdistribution_plot:
         plotvalues = ['invchi']
@@ -1637,17 +1677,23 @@ if make_fitnessdistribution_plot:
     for pv in plotvalues:
         do_print("Making fitness vs parameter plots...", be_verbose)
 
-        nrows_ppage = nrows_fitnessparamplot # Can be changed, all lines will be plotted, the number of
-                        # number of pages will be adapted accordingly.
+        # Can be changed, all lines will be plotted, the number of
+        # number of pages will be adapted accordingly.
+        nrows_ppage = nrows_fitnessparamplot
+
         ncols_ppage = ncols_fitnessparamplot # Same holds for the columns.
-        plotscalefactor = 12.0 # This sets the 'absolute size' of the line profile
-                                 # plots. The plots are always on A4 format, but the
-                                 # size of the labels are relative to the size of the
-                                 # plotting canvas. Therefore a higher number here
-                                 # means smaller labels on the plots.
+
+        # This sets the 'absolute size' of the line profile
+        # plots. The plots are always on A4 format, but the
+        # size of the labels are relative to the size of the
+        # plotting canvas. Therefore a higher number here
+        # means smaller labels on the plots.
+        plotscalefactor = 12.0
+
         plots_ppage = nrows_ppage * ncols_ppage
         npages = int(math.ceil(1.0*len(param_keys) / plots_ppage))
-        do_print("Plotting fitness vs parameter on " + str(int(npages)) + " page(s).", be_verbose)
+        do_print("Plotting fitness vs parameter on " + str(int(npages)) +
+            " page(s).", be_verbose)
 
         gen_id = map(lambda q: float(q[:4]), x['run_id'])
         if max(gen_id) < 1:
@@ -1659,7 +1705,8 @@ if make_fitnessdistribution_plot:
         fitparam_jpg_names = []
         lp = -1 # paramater counter
         for apage in xrange(npages):
-            fig, ax = plt.subplots(nrows_ppage, ncols_ppage, figsize=(plotscalefactor*1., plotscalefactor*1.41))
+            fig, ax = plt.subplots(nrows_ppage, ncols_ppage,
+                figsize=(plotscalefactor*1., plotscalefactor*1.41))
             for arow in xrange(nrows_ppage):
                 for acol in xrange(ncols_ppage):
                     lp = lp + 1 # Next parameter is plotted
@@ -1673,23 +1720,28 @@ if make_fitnessdistribution_plot:
                         elif pv == 'fitness':
                             plot_this = x['fitness'].values
                             the_ylabel = 'fitness'
-                        im1 = ax[arow,acol].scatter(x[param_keys[lp]].values, plot_this,
+                        im1 = ax[arow,acol].scatter(x[param_keys[lp]].values,
+                        plot_this,
                             s=10.0, c=scatter_colors)
                         ax[arow,acol].set_ylim(0, 1.1*np.nanmax(plot_this))
-                        ax[arow,acol].set_xlim(params_dic[param_keys[lp]][0], params_dic[param_keys[lp]][1])
+                        ax[arow,acol].set_xlim(params_dic[param_keys[lp]][0],
+                        params_dic[param_keys[lp]][1])
                         ax[arow,acol].set_title(param_keys[lp])#, fontsize=14)
                         if best_models_cutoff_method == 'Mokiem':
                             ax[arow,acol].axvspan(params_error_Mokiem[param_keys[lp]][0],
-                                params_error_Mokiem[param_keys[lp]][1], alpha=0.6, color='orange', zorder=0)
+                                params_error_Mokiem[param_keys[lp]][1],
+                                alpha=0.6, color='orange', zorder=0)
                         else:
                             ax[arow,acol].axvspan(params_error_1sig[param_keys[lp]][0],
-                                params_error_1sig[param_keys[lp]][1], alpha=0.6, color='orange', zorder=0)
+                                params_error_1sig[param_keys[lp]][1],
+                                alpha=0.6, color='orange', zorder=0)
                             ax[arow,acol].axvspan(params_error_2sig[param_keys[lp]][0],
-                                params_error[param_keys[lp]][1], alpha=0.3, color='yellow', zorder=0)
-                        ax[arow,acol].axvline(params_error_2sig[param_keys[lp]][2], alpha=1.0, color='black',lw=1.5)#, zorder=0)
+                                params_error[param_keys[lp]][1],
+                                alpha=0.3, color='yellow', zorder=0)
+                        ax[arow,acol].axvline(params_error_2sig[param_keys[lp]][2],
+                        alpha=1.0, color='black',lw=1.5)#, zorder=0)
                         ax[arow,acol].set_ylabel(the_ylabel)
 
-                        #print(param_keys[lp] + ' - ' + str(params_error[param_keys[lp]][2]) + '    [' + str(params_error[param_keys[lp]][0]) + ', ' +  str(params_error[param_keys[lp]][1]) + ']')
                     else:
                         ax[arow,acol].axis('off')
 
@@ -1811,8 +1863,10 @@ if make_lineprofiles_plot:
         x_best = x.loc[x['scaledRedChi2'] < best_models_cutoff_method]
         x_best_1sig = x.loc[x['scaledRedChi2'] < best_models_cutoff_method]
 
-    the_best_model = x.loc[x['scaledRedChi2'] == 1.0] #FIXME should instead just select lowest chi2
-    do_print("Amount of models with lowest chi2 is: " + str(int(len(the_best_model))), be_verbose)
+    #FIXME should instead just select lowest chi2
+    the_best_model = x.loc[x['scaledRedChi2'] == 1.0]
+    do_print("Amount of models with lowest chi2 is: " +
+        str(int(len(the_best_model))), be_verbose)
     the_best_model = the_best_model.iloc[0]
     the_best_model = the_best_model['run_id']
     do_print("The best model: " + the_best_model, be_verbose)
@@ -1843,17 +1897,16 @@ if make_lineprofiles_plot:
     #         os.system(rmtarcommand)
 
     ''' Setup page layout '''
-    nrows_ppage = nrows_lineprofileplot # Can be changed, all lines will be plotted, the number of
-                    # number of pages will be adapted accordingly.
+    # Can be changed, all lines will be plotted, the number of
+    # number of pages will be adapted accordingly.
+    nrows_ppage = nrows_lineprofileplot
     ncols_ppage = ncols_lineprofileplot # Same holds for the columns.
-    plotscalefactor = 12.0 # This sets the 'absolute size' of the line profile
-                             # plots. The plots are always on A4 format, but the
-                             # size of the labels are relative to the size of the
-                             # plotting canvas. Therefore a higher number here
-                             # means smaller labels on the plots.
+
+    plotscalefactor = 12.0
     plots_ppage = nrows_ppage * ncols_ppage
     npages = int(math.ceil(1.0*numlines / plots_ppage))
-    do_print("Plotting the line profiles on " + str(int(npages)) + " pages.", be_verbose)
+    do_print("Plotting the line profiles on " + str(int(npages)) + " pages.",
+        be_verbose)
 
     ''' Reading the spectrum '''
     wave, flux, error = np.genfromtxt(thespectrumfile).T
@@ -1864,7 +1917,8 @@ if make_lineprofiles_plot:
     # For each page we set up a grid of axes, each plotting the models and
     # data of one diagnostic line.
     for apage in xrange(npages):
-        fig, ax = plt.subplots(nrows_ppage, ncols_ppage, figsize=(plotscalefactor*1., plotscalefactor*1.41))
+        fig, ax = plt.subplots(nrows_ppage, ncols_ppage,
+        figsize=(plotscalefactor*1., plotscalefactor*1.41))
         for arow in xrange(nrows_ppage):
             for acol in xrange(ncols_ppage):
                 lc = lc + 1 # Next diagnostic line is plotted
@@ -1877,8 +1931,10 @@ if make_lineprofiles_plot:
                         bmdir_base = best_models_dirs[0]
                         os.system('mkdir -p ' + bmdir_base)
                         name_bm = bmdir_base.split('/')[-1]
-                        os.system('tar -xzf ' + bmdir_base + '.tar.gz -C ' + bmdir_base + '/.')
-                        linefile_tmp = bmdir_base + '/' + linenames[lc] + '.prof.fin'
+                        os.system('tar -xzf ' + bmdir_base + '.tar.gz -C '
+                            + bmdir_base + '/.')
+                        linefile_tmp = (bmdir_base + '/' + linenames[lc]
+                            + '.prof.fin')
                         linewave_tmp, lineflux_tmp = np.genfromtxt(linefile_tmp).T
 
                         lineflux_min = np.copy(lineflux_tmp)
@@ -1900,10 +1956,13 @@ if make_lineprofiles_plot:
                                 os.system('tar -xzf ' + bmdir + '.tar.gz -C ' + bmdir + '/.')
                             linefile_tmp = bmdir + '/' + linenames[lc] + '.prof.fin'
                             linewave_tmp, lineflux_tmp = np.genfromtxt(linefile_tmp).T
-                            linewave_tmp = vrshift(linewave_tmp, line_radialvelocity[lc])
+                            linewave_tmp = vrshift(linewave_tmp,
+                                line_radialvelocity[lc])
 
-                            lineflux_min = np.min(np.array([lineflux_min, lineflux_tmp]), axis=0)
-                            lineflux_max = np.max(np.array([lineflux_max, lineflux_tmp]), axis=0)
+                            lineflux_min = np.min(np.array([lineflux_min,
+                                lineflux_tmp]), axis=0)
+                            lineflux_max = np.max(np.array([lineflux_max,
+                                lineflux_tmp]), axis=0)
 
                             if bmdir == bestmodeldir:
                                 # The best fitting model in dargreen, note the
@@ -1913,74 +1972,86 @@ if make_lineprofiles_plot:
                                 ax[arow, acol].plot(linewave_tmp, lineflux_tmp,
                                     color='#2a7f2a', # darkgreen!
                                     zorder=len(best_models_dirs)+20, lw=3.0)
-                                np.savetxt(plotlineprofdir + linenames[lc] + '.best', np.array([linewave_tmp, lineflux_tmp]).T)
+                                np.savetxt(plotlineprofdir + linenames[lc]
+                                    + '.best',
+                                    np.array([linewave_tmp, lineflux_tmp]).T)
                             elif plot_individual_lines:
                                 # The x best models in lightgreen
                                 ax[arow, acol].plot(linewave_tmp, lineflux_tmp,
                                     color='#8cd98c') # lightgreen
 
                         except:
-                            do_print('Could not find lineprofiles of ' + bmdir.split('/')[-1], be_verbose)
+                            do_print('Could not find lineprofiles of ' +
+                                bmdir.split('/')[-1], be_verbose)
                             lineprofiles_incomplete = True
 
                     ax[arow, acol].fill_between(linewave_tmp, lineflux_min,
                         lineflux_max, color='#8cd98c')
-                    np.savetxt(plotlineprofdir + linenames[lc] + '.minmax', np.array([linewave_tmp, lineflux_min, lineflux_max]).T)
+                    np.savetxt(plotlineprofdir + linenames[lc] + '.minmax',
+                        np.array([linewave_tmp, lineflux_min, lineflux_max]).T)
 
                     ''' Plot the data '''
                     # The spectra are cropped because otherwise plotting
                     # will take up a lot of memory. (The set_xlim might therefore
                     # be a bit unnecessary)
-                    wave_tmp, flux_tmp = parallelcrop(wave, flux, linestarts[lc], linestops[lc])
-                    wave_tmp, error_tmp = parallelcrop(wave, error, linestarts[lc], linestops[lc])
+                    wave_tmp, flux_tmp = parallelcrop(wave, flux,
+                        linestarts[lc], linestops[lc])
+                    wave_tmp, error_tmp = parallelcrop(wave, error,
+                        linestarts[lc], linestops[lc])
                     ax[arow, acol].axhline(1.0, color='grey', lw=1.0)
                     if linenames[lc] == 'HEI4026':
                         ax[arow, acol].set_title('HE4026')
                     else:
                         ax[arow, acol].set_title(linenames[lc])
 
-                    # if linenames[lc] == 'HEII4686':
-                    #     ax[arow, acol].set_xlim(4647, 4720)
-                    #     do_print("\nWARNING!!!!!!! manually adapting plot bounds\n", True)
-                    # elif linenames[lc] == 'HALPHA':
-                    #     ax[arow, acol].set_xlim(6535, 6590)
-                    #     do_print("\nWARNING!!!!!!! manually adapting plot bounds\n", True)
-                    # else:
                     ax[arow, acol].set_xlim(linestarts[lc], linestops[lc])
-                    # ax[arow, acol].set_xlim(linestarts[lc], linestops[lc])
-                    # ax[arow, acol].set_xlabel(r'Wavelength ($\rm \AA$)')
-                    # ax[arow, acol].set_ylabel(r'Normalised flux')
-                    flux_renorm_tmp = renormalize_line(wave_tmp, flux_tmp, line_norm_starts[lc], line_norm_leftval[lc], line_norm_stops[lc], line_norm_rightval[lc])
-                    # ax[arow, acol].errorbar(wave_tmp, flux_renorm_tmp, yerr=error_tmp, marker='o', markersize=0.1, linestyle='None', color='black', zorder=0)
-                    # if linenames[lc] == 'HEII4686':
-                    #     import physics_functions as pf
-                    #     wave_tmp = pf.vrshift(wave_tmp, -120)
-                    #     do_print("\nWARNING!!!!!!! applying RV shift!!!!!!!!\n", True)
+                    flux_renorm_tmp = renormalize_line(wave_tmp, flux_tmp,
+                        line_norm_starts[lc], line_norm_leftval[lc],
+                        line_norm_stops[lc], line_norm_rightval[lc])
 
                     if len(wave_tmp) > 150:
                         box = 2
                         if len(wave_tmp) > 200:
                             box = 3
-                        do_print(linenames[lc] + ' plotted with less points, box = ' + str(int(box)), be_verbose)
-                        ax[arow, acol].errorbar(wave_tmp[box:-box:box], flux_renorm_tmp[box:-box:box], yerr=error_tmp[box:-box:box], marker='o', markersize=0.1, linestyle='None', color='black', zorder=10e10, alpha=0.6)
+                        do_print(linenames[lc] +
+                            ' plotted with less points, box = ' + str(int(box)),
+                            be_verbose)
+                        ax[arow, acol].errorbar(wave_tmp[box:-box:box],
+                            flux_renorm_tmp[box:-box:box],
+                            yerr=error_tmp[box:-box:box], marker='o',
+                            markersize=0.1, linestyle='None', color='black',
+                            zorder=10e10, alpha=0.6)
                     else:
-                        ax[arow, acol].errorbar(wave_tmp, flux_renorm_tmp, yerr=error_tmp, marker='o', markersize=0.1, linestyle='None', color='black', zorder=10e10, alpha=0.6)
+                        ax[arow, acol].errorbar(wave_tmp, flux_renorm_tmp,
+                            yerr=error_tmp, marker='o', markersize=0.1,
+                            linestyle='None', color='black', zorder=10e10,
+                            alpha=0.6)
 
 
                     ''' Plot extra spectrum if wanted '''
                     if include_extra_spectrum:
                         try:
-                            cmfgenwave_tmp, cmfgenflux_tmp = parallelcrop(cmfgenwave1, cmfgenflux1, linestarts[lc], linestops[lc])
-                            ax[arow, acol].plot(cmfgenwave_tmp, cmfgenflux_tmp, color='blue', lw=2.0, zorder=len(best_models_dirs)+20)
+                            cmfout3 = parallelcrop(cmfgenwave1, cmfgenflux1,
+                                linestarts[lc], linestops[lc])
+                            cmfgenwave_tmp, cmfgenflux_tmp = cmfout3
+                            ax[arow, acol].plot(cmfgenwave_tmp, cmfgenflux_tmp,
+                                color='blue', lw=2.0,
+                                zorder=len(best_models_dirs)+20)
                         except:
                             if extra_spectrum_path1 != "":
-                                do_print(">> Something might have gone wrong with plotting the extra spectra ", True)
+                                do_print(">> Something might have gone wrong " +
+                                "with plotting the extra spectra ", True)
                         try:
-                            cmfgenwave_tmp, cmfgenflux_tmp = parallelcrop(cmfgenwave2, cmfgenflux2, linestarts[lc], linestops[lc])
-                            ax[arow, acol].plot(cmfgenwave_tmp, cmfgenflux_tmp, color='orange', lw=2.0, zorder=len(best_models_dirs)+21)
+                            cmfout4 = parallelcrop(cmfgenwave2, cmfgenflux2,
+                                linestarts[lc], linestops[lc])
+                            cmfgenwave_tmp, cmfgenflux_tmp = cmfout4
+                            ax[arow, acol].plot(cmfgenwave_tmp, cmfgenflux_tmp,
+                                color='orange', lw=2.0,
+                                zorder=len(best_models_dirs)+21)
                         except:
                             if extra_spectrum_path2 != "":
-                                do_print(">> Something might have gone wrong with plotting the extra spectra ", True)
+                                do_print(">> Something might have gone wrong " +
+                                "with plotting the extra spectra ", True)
                 else:
                     # We loop through all axes (rows, cols) that are set up,
                     # but if there are not enough lines to fill a page axes
@@ -1989,37 +2060,19 @@ if make_lineprofiles_plot:
 
         plt.tight_layout()
 
-        # # Saving page in pdf. Pdfs will be sticked later.
-        # pdfname_tmp = plotpath + 'line_profiles_p' + str(int(apage)) + '.pdf'
-        # line_pdf_names.append(pdfname_tmp)
-        # plt.savefig(pdfname_tmp)
-        # plt.close()
-        # do_print("Lineprofiles: saved page " + str(int(apage+1)) + " out of " + str(int(npages)) + " pages.", be_verbose)
-
         prof_param_pagename = plotpath + 'profiles_' + str(int(apage)) + '.jpg'
         prof_jpg_names.append(prof_param_pagename)
         plt.savefig(prof_param_pagename, dpi=400)
         plt.close()
         # plt.show()
-        do_print("Lineprofiles: saved page " + str(int(apage+1)) + " out of " + str(int(npages)) + " pages.", be_verbose)
+        do_print("Lineprofiles: saved page " + str(int(apage+1)) +
+            " out of " + str(int(npages)) + " pages.", be_verbose)
 
     with open(plotpath + name_lineprofiles_plot, "wb") as out_file:
         out_file.write(img2pdf.convert(prof_jpg_names))
 
     for ajpg in prof_jpg_names:
         os.system("rm " + ajpg)
-
-    # # Merge all line profile plot pages into one document.
-    # if os.path.isfile(plotpath + name_lineprofiles_plot):
-    #     os.system("rm " + plotpath + name_lineprofiles_plot)
-    # merger = PdfFileMerger()
-    # for filename in line_pdf_names:
-    #     merger.append(PdfFileReader(file(filename, 'rb')))
-    # merger.write(plotpath + name_lineprofiles_plot)
-    #
-    # # Remove the individual pages after the file has been merged.
-    # for filename in line_pdf_names:
-    #     os.system("rm " + filename)
 
 ''' ------------------------------------------'''
 '''   Videos of parameter space exploration   '''
@@ -2030,7 +2083,8 @@ if make_paramspace_avi:
 
         xparam = param_pair[0]
         yparam = param_pair[1]
-        do_print("Making video of paramater space exploration of " + xparam + ", " + yparam, be_verbose)
+        do_print("Making video of paramater space exploration of " +
+            xparam + ", " + yparam, be_verbose)
 
         imnames = xparam + '_' + yparam + '_exploration'
 
@@ -2047,7 +2101,8 @@ if make_paramspace_avi:
             themutationrate = mutation[int(the_genid)]
             themutationrate = '{0:.4f}'.format(themutationrate)
             fig, ax = plt.subplots()
-            ax.set_title("Gen = " + the_genid + ", Mutation rate = " + themutationrate)
+            ax.set_title("Gen = " + the_genid + ", Mutation rate = " +
+                themutationrate)
             ax.scatter(p1_tmp, p2_tmp, c=color_array)
             ax.set_xlim(*params_dic[xparam])
             ax.set_ylim(*params_dic[yparam])
@@ -2101,14 +2156,16 @@ if make_correlation_plot:
     make_legend = True
     for which_plot in correlation_plot_list:
 
-        fig, ax = plt.subplots(len(paramlist)-1,len(paramlist)-1, figsize=(plotscalefactor*1.0, plotscalefactor*1.0))
+        fig, ax = plt.subplots(len(paramlist)-1,len(paramlist)-1,
+            figsize=(plotscalefactor*1.0, plotscalefactor*1.0))
         if which_plot == 'chi2':
             the_colormap = colorbar_chi2
         else:
             the_colormap = colorbar_other
 
         if which_plot == 'chi2':
-            do_print("Making correlation plot for all lines together ", be_verbose)
+            do_print("Making correlation plot for all lines together ",
+                be_verbose)
         else:
             do_print("Making correlation plot for " + which_plot, be_verbose)
 
@@ -2118,8 +2175,6 @@ if make_correlation_plot:
                 xparam = paramlist[ii]
                 yparam = paramlist[jj]
                 if (xparam != yparam) and ([yparam, xparam] not in param_pairs_correlation):
-
-                    #do_print("Assessing correlation between " + xparam + " and " + yparam , be_verbose)
 
                     param_pairs_correlation.append([xparam, yparam])
 
@@ -2150,7 +2205,8 @@ if make_correlation_plot:
                         for p1low, p1up in zip(p1_lowbound, p1_upbound):
                             i2 = 0
                             for p2low, p2up in zip(p2_lowbound, p2_upbound):
-                                if (p1low < ap1) and (p1up > ap1) and (p2low < ap2) and (p2up > ap2):
+                                if ((p1low < ap1) and (p1up > ap1) and
+                                    (p2low < ap2) and (p2up > ap2)):
                                     if achi != 999999999:
                                         chi2_matrix[i1][i2].append(float(achi))
                                 i2 = i2 + 1
@@ -2164,17 +2220,13 @@ if make_correlation_plot:
                                 median_tmp = float('nan')
                             chi2_matrix[i1][i2] = median_tmp
 
-                    if which_plot == 'chi2':# and (np.log10(np.nanmax(chi2_matrix)) - np.log10(np.nanmin(chi2_matrix)) > 2.0):
-                        # Fidle with scale of correlation plot
-                        # if the differences between the chi2s are very large, it may be
-                        # better to use a log scale
-
+                    if which_plot == 'chi2':
                         chi2_matrix = np.log10(chi2_matrix)
-                        #do_print("Using log scale for correlation plot ", True)
                     else:
                         chi2_matrix = np.array(chi2_matrix)
 
-                    chi2_matrix = chi2_matrix.T # so that x and y correspond with how we normally define x and y.
+                    # so that x and y correspond x and y definition.
+                    chi2_matrix = chi2_matrix.T
                     ax[jj-1][ii].imshow(chi2_matrix, cmap=the_colormap)
                     ax[jj-1][ii].set_yticks([])
                     ax[jj-1][ii].set_xticks([])
@@ -2188,9 +2240,15 @@ if make_correlation_plot:
                         ax[jj-1][ii].axis('off')
                         if jj == 1 and ii == len(paramlist)-2:
                             if which_plot == 'chi2':
-                                ax[jj-1][ii].text(0.5, 0.8, 'Correlation\n(all lines)', ha='center', va='center', transform=ax[jj-1][ii].transAxes)
+                                ax[jj-1][ii].text(0.5, 0.8,
+                                    'Correlation\n(all lines)',
+                                    ha='center', va='center',
+                                    transform=ax[jj-1][ii].transAxes)
                             else:
-                                ax[jj-1][ii].text(0.5, 0.8, 'Correlation\n(' + which_plot + ')', ha='center', va='center',transform=ax[jj-1][ii].transAxes)
+                                ax[jj-1][ii].text(0.5, 0.8,
+                                    'Correlation\n(' + which_plot + ')',
+                                    ha='center', va='center',
+                                    transform=ax[jj-1][ii].transAxes)
                         if jj == 1 and ii == len(paramlist)-2:
                             if which_plot == 'chi2':
                                 if the_colormap.endswith('_r'):
@@ -2199,18 +2257,23 @@ if make_correlation_plot:
                                     the_colormap = the_colormap + '_r'
                             else:
                                 doreverse = False
-                            img = sns.heatmap(np.array([[0,1]]), ax=ax[jj-1][ii], mask=np.array([[True,True]]),
-                            cbar_kws={"orientation": "horizontal"}, cmap=the_colormap)
+                            img = sns.heatmap(np.array([[0,1]]),
+                                ax=ax[jj-1][ii],
+                                mask=np.array([[True,True]]),
+                            cbar_kws={"orientation": "horizontal"},
+                                cmap=the_colormap)
                             cbar = img.collections[0].colorbar
                             cbar.set_ticks([.2, .8])
-                            cbar.set_ticklabels(['<-- worse fit', '\nbetter fit -->'])
+                            cbar.set_ticklabels(['<-- worse fit',
+                                '\nbetter fit -->'])
 
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.02, wspace=0.05)
         if which_plot == 'chi2':
-            plt.savefig(plotpath + name_correlation_plot) #FIXME I would like to have this figure too, on A4 page format...
-                                                      # However editing canvas size or rect in tight_layout spreads the plots over
-                                                      # the full A4, I want them an the top of middle, but in a square, not spread out :(
+            # FIXME I would like to have this figure too, on A4 page format...
+            # However editing canvas size or rect in tight_layout spreads the plots over
+            # the full A4, I want them an the top of middle, but in a square, not spread out :(
+            plt.savefig(plotpath + name_correlation_plot)
             plt.close()
         else:
             the_jpg_name = plotpath + 'correlation_' + which_plot + '.jpg'
@@ -2232,23 +2295,20 @@ if make_correlation_plot:
 
 if make_fitnessdistribution_per_line_plot:
 
-    do_print("Making fitness per parameter plots per diagnostic line...", be_verbose)
+    do_print("Making fitness per parameter plots per diagnostic line...",
+        be_verbose)
 
     fitparam_jpg_names = []
 
     for diagnostic in linenames:
 
-        nrows_ppage = nrows_fitnessparamplot # Can be changed, all lines will be plotted, the number of
-                        # number of pages will be adapted accordingly.
-        ncols_ppage = ncols_fitnessparamplot # Same holds for the columns.
-        plotscalefactor = 12.0 # This sets the 'absolute size' of the line profile
-                                 # plots. The plots are always on A4 format, but the
-                                 # size of the labels are relative to the size of the
-                                 # plotting canvas. Therefore a higher number here
-                                 # means smaller labels on the plots.
+        nrows_ppage = nrows_fitnessparamplot
+        ncols_ppage = ncols_fitnessparamplot
+        plotscalefactor = 12.0
         plots_ppage = nrows_ppage * ncols_ppage
         npages = int(math.ceil(1.0*len(param_keys) / plots_ppage))
-        do_print("Plotting fitness vs parameter for " + diagnostic + " on " + str(int(npages)) + " page(s).", be_verbose)
+        do_print("Plotting fitness vs parameter for " + diagnostic +
+            " on " + str(int(npages)) + " page(s).", be_verbose)
 
         gen_id = map(lambda q: float(q[:4]), x['run_id'])
         if max(gen_id) < 1:
@@ -2259,7 +2319,8 @@ if make_fitnessdistribution_per_line_plot:
 
         lp = -1 # paramater counter
         for apage in xrange(npages):
-            fig, ax = plt.subplots(nrows_ppage, ncols_ppage, figsize=(plotscalefactor*1., plotscalefactor*1.41))
+            fig, ax = plt.subplots(nrows_ppage, ncols_ppage,
+                figsize=(plotscalefactor*1., plotscalefactor*1.41))
             for arow in xrange(nrows_ppage):
                 for acol in xrange(ncols_ppage):
                     lp = lp + 1 # Next parameter is plotted
@@ -2267,20 +2328,24 @@ if make_fitnessdistribution_per_line_plot:
                         line_fitness = x[diagnostic].values
                         ax[arow,acol].scatter(x[param_keys[lp]].values, line_fitness,
                             s=10.0, c=scatter_colors)
-                        # ax[arow,acol].set_ylim(0, 1.1*maxylim) # Sometimes gives an error
-                        ax[arow,acol].set_xlim(params_dic[param_keys[lp]][0], params_dic[param_keys[lp]][1])
-                        ax[arow,acol].set_title(param_keys[lp])#, fontsize=14)
+                        ax[arow,acol].set_xlim(params_dic[param_keys[lp]][0],
+                            params_dic[param_keys[lp]][1])
+                        ax[arow,acol].set_title(param_keys[lp])
                         ax[arow,acol].axvspan(params_error_1sig[param_keys[lp]][0],
-                            params_error_1sig[param_keys[lp]][1], alpha=0.6, color='orange', zorder=0)
+                            params_error_1sig[param_keys[lp]][1], alpha=0.6,
+                                color='orange', zorder=0)
                         ax[arow,acol].axvspan(params_error_2sig[param_keys[lp]][0],
-                            params_error[param_keys[lp]][1], alpha=0.3, color='yellow', zorder=0)
-                        ax[arow,acol].axvline(params_error_2sig[param_keys[lp]][2], alpha=1.0, color='black',lw=1.5)#, zorder=0)
+                            params_error[param_keys[lp]][1], alpha=0.3,
+                                color='yellow', zorder=0)
+                        ax[arow,acol].axvline(params_error_2sig[param_keys[lp]][2],
+                            alpha=1.0, color='black',lw=1.5)
 
                     else:
                         ax[arow,acol].axis('off')
 
 
-            plt.suptitle('Fitness vs. parameter (' + diagnostic + ')', fontsize=16)
+            plt.suptitle('Fitness vs. parameter (' + diagnostic + ')',
+                fontsize=16)
             plt.tight_layout(rect=[0, 0.00, 1.0, 0.95])
 
             # Load the earlier produced colorbar/legend.
@@ -2290,7 +2355,8 @@ if make_fitnessdistribution_per_line_plot:
             newax.imshow(imlegend)
             newax.axis('off')
 
-            fit_param_pagename_jpg = plotpath + 'overview_' + diagnostic + '_' + str(int(apage)) + '.jpg'
+            fit_param_pagename_jpg = (plotpath + 'overview_' + diagnostic
+                + '_' + str(int(apage)) + '.jpg')
             fitparam_jpg_names.append(fit_param_pagename_jpg)
             plt.savefig(fit_param_pagename_jpg, dpi=200)
             plt.close()

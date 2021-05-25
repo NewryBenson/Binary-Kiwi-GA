@@ -17,3 +17,5 @@ slurm-*out
 example_input2/*
 test_scripts/*
 *.job_backup
+sed_correction_analysis.py
+sed_correction_indat.py

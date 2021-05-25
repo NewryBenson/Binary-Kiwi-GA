@@ -375,7 +375,10 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
             defvals, defnames)
     # For approximating vinf with the vesc we need the correct
     # value for the radius to be already present in the dct.
-    dct = get_radius(dct, radinfo)
+    if isinstance(radinfo, float):
+        dct['radius'] = str(radinfo)
+    else:
+        dct = get_radius(dct, radinfo)
     dct = get_vinf(dct)
     dct = calculate_mdot(dct)
 
@@ -430,7 +433,7 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     # When fx > 1000, estimate it based on mdot and vinf:
     if float(dct['fx']) > 1000:
         dct = get_fx(dct)
-        print('fx estimated = ' + dct['fx'])
+        # print('fx estimated = ' + dct['fx'])
     # Use logscale fx value if that is in a valid range 
     #  (only when it has set to such value in defaults, or in para-
     #  meter space, it will)
