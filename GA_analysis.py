@@ -23,6 +23,7 @@ from collections import OrderedDict
 from scipy import stats
 from scipy.optimize import curve_fit
 import warnings
+import argparse
 
 from PyPDF2 import PdfFileMerger, PdfFileReader
 import cv2 #only required if make_paramspace_avi=True
@@ -37,6 +38,7 @@ import cmocean
 import scipy
 import fastwind_wrapper as fwr
 import paths as ppp
+
 
 ''' ----------------------------------------------------------------------'''
 ''' ----------------------------------------------------------------------'''
@@ -55,8 +57,18 @@ import paths as ppp
 # The line profiles per model should either be in the 0000_0000.tar.gz archive,
 # or alternatively if already unpacked, the line profiles should be in a folder
 # names 0000_0000 in the parent directory 0000. (example numbers)
-outpath = ppp.outpath_analysis 
-datapath = ppp.datapath_analysis 
+outpath = ppp.outpath_analysis
+datapath = ppp.datapath_analysis
+
+parser = argparse.ArgumentParser()
+parser.add_argument('runname', help='Specify a run name')
+parser.add_argument('-set', help=('Which setting? "full", "short" or "manual"'
+    ", (default = short)"), default='short')
+parser.add_argument('-prof', help='Make line profile plots',
+    action='store_true')
+parser.add_argument('-verbose', help='Be verbose (default = False)',
+    action='store_true')
+args = parser.parse_args()
 
 ''' ------------------------------------------'''
 '''      which plots do you want to make?     '''
@@ -70,10 +82,10 @@ datapath = ppp.datapath_analysis
 # 'full' =  all possible plots (will take a while)
 # 'short' = does not generate correlation and fitness plots per line
 # 'manual' = only selected plots, to be specified below
-full_short_manual = 'full'
+full_short_manual = args.set
 
 # Verbosity: if True, print progress, if False, print only errors/warnings
-be_verbose = True
+be_verbose = args.verbose
 
 # If plot_individual_lines is set to True, then all models in the 2 sigma
 # range will be plotted --> when this are many models, this can lead to
@@ -90,7 +102,7 @@ if full_short_manual in ('manual'):
     make_fitnessdistribution_plot_P = False
     make_fitnessdistribution_plot_fitness = False # False when fitmeasure = chi2
     make_fitnessdistribution_per_line_plot = False
-    make_derived_fitness_plots = False
+    make_derived_fitness_plots = True
     make_chi2pgen_plot = False
     make_correlation_plot = False # will always be done when make_correlation_per_line_plot = True
     make_correlation_per_line_plot = False
@@ -123,8 +135,7 @@ else:
     print('Unknown value for "full_short_manual" ')
     sys.exit()
 
-plotprofs = sys.argv[2]
-if plotprofs in ('plotprofs', 'plot_profs', 'pp', 'prof'):
+if args.prof:
     # Will take some time depending on how many models are included.
     make_lineprofiles_plot = True
 else:
@@ -138,6 +149,14 @@ make_param_dist_plot_detail = False
 # If you want to only plot the first x (given by newmaxgen) generations
 adapt_ngen = False
 newmaxgen = 35
+
+# Default: False (outputfile_all_ionising_fluxes)
+# If this parameter is set to true, only the HI ionising fluxes
+# log(Q0) and log(q0) are given as output. If you need all, then set this
+# parameter to True. This is not done by default because it will mess up
+# the report page and will make a lot of derived parameter plots, making
+# the report less clear, if those parameters are not needed. #FIXME
+outputfile_all_ionising_fluxes = False
 
 # Videos
 make_paramspace_avi = False
@@ -744,6 +763,16 @@ if (make_derived_fitness_plots or make_run_summary) and not no_radius_provided:
                             ,'specmass'
                             ,'vesc']
 
+    # Some parameters are only included in runs after an GA update
+    if 'logq0' in x.columns:
+        if outputfile_all_ionising_fluxes:
+             ionflux_pars = ['logq0', 'logQ0', 'logq1', 'logQ1', 'logq2', 'logQ2']
+        else:
+            ionflux_pars = ['logQ0', 'logq0']
+        for acol in ionflux_pars:
+            x.loc[(x[acol] == -888), acol] = float('NaN')
+        derived_parameters = derived_parameters + ionflux_pars
+
     if 'teff' in var_dct.keys():
         x['luminosity'] = get_luminosity(x['teff'], x['radius'])
     else:
@@ -986,8 +1015,11 @@ if make_run_summary:
     if not no_radius_provided:
 
         numround = 2
+        nderived = len(derivedpar_error1sig_dic)
+        if nderived > 12:
+            print("WARNING: Run summary page too full")
 
-        for lp in range(len(derivedpar_error1sig_dic)):
+        for lp in range(nderived):
             strpname = derivedpar_error1sig_dic.keys()[lp]
             if strpname == 'vesc':
                 numround_tmp = 0
@@ -1012,32 +1044,34 @@ if make_run_summary:
                 +  str(round(derivedpar_error1sig_dic[strpname][1],
                     numround_tmp)) + ']')
 
-            ax[1].text(0.05, 0.71-base-lp*ew*pls, strpname,
+            yvali = 0.80
+
+            ax[1].text(0.05, yvali-base-lp*ew*pls, strpname,
                 transform=ax[1].transAxes, fontsize=fz, va='top')
-            ax[1].text(0.50, 0.71-base-lp*ew*pls, strbestp,
+            ax[1].text(0.50, yvali-base-lp*ew*pls, strbestp,
                 transform=ax[1].transAxes, fontsize=fz, va='top', ha='right')
 
             hpls = pls*0.25*0.5
-            ax[1].text(0.52, (0.71-base-lp*ew*pls)+hpls, '+',
+            ax[1].text(0.52, (yvali-base-lp*ew*pls)+hpls, '+',
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.52, (0.71-base-lp*ew*pls)-hpls, '-',
+            ax[1].text(0.52, (yvali-base-lp*ew*pls)-hpls, '-',
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.55, (0.71-base-lp*ew*pls)+hpls, strdiffplus_1sig,
+            ax[1].text(0.55, (yvali-base-lp*ew*pls)+hpls, strdiffplus_1sig,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.55, (0.71-base-lp*ew*pls)-hpls, strdiffmin_1sig,
+            ax[1].text(0.55, (yvali-base-lp*ew*pls)-hpls, strdiffmin_1sig,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.70, 0.71-base-lp*ew*pls, strrange_1sig,
+            ax[1].text(0.70, yvali-base-lp*ew*pls, strrange_1sig,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
 
-            ax[1].text(0.52, (0.71-base2-lp*ew*pls)+hpls - 0.5*pls, '+',
+            ax[1].text(0.52, (yvali-base2-lp*ew*pls)+hpls - 0.5*pls, '+',
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.52, (0.71-base2-lp*ew*pls)-hpls - 0.5*pls, '-',
+            ax[1].text(0.52, (yvali-base2-lp*ew*pls)-hpls - 0.5*pls, '-',
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.55, (0.71-base2-lp*ew*pls)+hpls - 0.5*pls, strdiffplus,
+            ax[1].text(0.55, (yvali-base2-lp*ew*pls)+hpls - 0.5*pls, strdiffplus,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.55, (0.71-base2-lp*ew*pls)-hpls - 0.5*pls, strdiffmin,
+            ax[1].text(0.55, (yvali-base2-lp*ew*pls)-hpls - 0.5*pls, strdiffmin,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
-            ax[1].text(0.70, 0.71-base2-lp*ew*pls - 0.5*pls, strrange,
+            ax[1].text(0.70, yvali-base2-lp*ew*pls - 0.5*pls, strrange,
                 transform=ax[1].transAxes, fontsize=fz_err, va='top')
 
             bestparstr = (strpname.ljust(cwtxt) + strbestp.ljust(cwtxt) +
