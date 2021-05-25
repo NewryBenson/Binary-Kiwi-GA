@@ -3,4 +3,4 @@
 # fixed_radius <radius in solar radii>
 # If luminosity anchor type:
 # <bandname> <observed magnitude> <zero point system>
-fixed_radius 12.0
+SPHERE_Ks -4.68 vega

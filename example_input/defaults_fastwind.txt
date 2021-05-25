@@ -4,6 +4,10 @@ O              -1
 Si             -1
 Mg             -1
 P              -1
+Fe             -1
+S              -1
+Na             -1
+Ca             -1
 optne_update   T
 he_one         T
 it_start       0 
@@ -29,6 +33,7 @@ expansion      F
 set_first      1
 set_step       2
 fclump         1.0
+logfclump      10.0 
 vclstart       0.15
 vclmax         0.30
 opthopf        F
@@ -38,6 +43,7 @@ fic            -1
 hclump         1.0
 fx             0.0
 uinfx          460.0
-mx             20.0
-gamx           1.0
+mx             25.0
+gamx           0.75
 Rinx           1.5
+logfx          10.0
