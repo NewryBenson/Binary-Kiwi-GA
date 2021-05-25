@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=R136a3_UVopt_2102b
-#SBATCH -t 50:00:00
-#SBATCH -N 10
-#SBACTH -n 240
+#SBATCH --job-name=H35_UVopt_2012z
+#SBATCH -t 72:00:00
+#SBATCH -N 8
+#SBATCH -n 192
 #SBATCH --no-requeue
 
-runname=R136a3_UVopt_2102b
-do_restart=no
-ncpu=240
-inidir=FW_inicalc
+runname=H35_UVopt_2012z
+do_restart=yes
+ncpu=192
+inidir=v10_HHeNCOPSi
 
 echo Run ${runname}
 echo Using $ncpu CPUs
@@ -20,7 +20,7 @@ module load Python/3.6.6-intel-2018b
 
 # Define paths
 scratch=/scratch-shared/sbrands/${runname}/
-homedir=/home/USERNAME/pyEA/
+homedir=/home/sbrands/pyEA/
 
 echo Copying files
 

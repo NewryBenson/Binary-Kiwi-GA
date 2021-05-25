@@ -17,3 +17,5 @@ slurm-*out
 example_input2/*
 test_scripts/*
 *.job_backup
+v10_HHeNCOPSi/*
+v10_MgSi_ini/*
