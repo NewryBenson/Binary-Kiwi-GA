@@ -789,7 +789,7 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         # Adjust maxlen in case of a CMF line
         if nme.startswith('UV_'):
             delta_wave_data = wave_data[1] - wave_data[0]
-            delta_save = delta_wave_data * 10.0
+            delta_save = delta_wave_data  
             maxlen = (max(wave_data)-min(wave_data))/delta_save
 
         # Replace the model output by a low resolution spectrum

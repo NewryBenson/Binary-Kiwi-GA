@@ -25,8 +25,8 @@ narrow_type           step             # either 'step' or 'frac'
 broad_type            frac             # either 'step' or 'frac'
 doublebroad           no               # either yes or no
 mut_rate_na           0.50             # mut. rate of narrow gauss mutation 
-mut_rate_init         0.05             # initial rate of broad gauss. mutation
-mut_adjust_type       autocharb        # 'constant' 'charbonneau' or 'autocharb'
+mut_rate_init         0.083            # initial rate of broad gauss. mutation
+mut_adjust_type       constant         # 'constant' 'charbonneau' or 'autocharb'
 mut_rate_min          0.005            # minimum mutation rate 
 mut_rate_max          0.083            # maximum mutation rate
 mut_rate_factor       1.5              # factor of mutation rate change 

@@ -162,9 +162,9 @@ elif ctrldct["inicalcdir"].startswith('v11'):
         checkdict["FW version"] = False
     for aline in lineinfo[0]:
         if not aline.startswith('UV_'):
-            print("ERROR: non CMF line included in linelist: " + aline)
-            print("   This is not tested for v11. Aborting pre-run check")
-            sys.exit()
+            print("WARNING: non CMF line included in linelist: " + aline)
+            print("   This is not yet tested for v11.")
+            continue
         strt0, stop0 = aline.split('_')[1:]
         if len(strt0) == 5 and len(stop0) == 5:
             if not float(stop0) > float(strt0):
@@ -194,7 +194,7 @@ else:
 printsection('Mutation rate')
 checkdict["Mutation"] = True
 mut_adjust_type = ctrldct["mut_adjust_type"]
-if not mut_adjust_type in ('contstant', 'charbonneau', 'autocharb'):
+if not mut_adjust_type in ('constant', 'charbonneau', 'autocharb'):
     print('ERROR: mut_adjust_type unknown: ' + mut_adjust_type)
     checkdict["Mutation"] = False
 
