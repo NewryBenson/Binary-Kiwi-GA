@@ -25,7 +25,7 @@ import fastwind_wrapper as fw
 import population as pop
 
 jobscriptfile = 'run_kiwiGA.job' # name of job script file 
-hours_str = '72' # maximum wall time 
+hours_str = '28' # maximum wall time 
 n_cpu_core = 24.0 # number of CPUs per node
 username = 'sbrands'
 codedir = 'Kiwi-GA'

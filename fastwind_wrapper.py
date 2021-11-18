@@ -789,7 +789,8 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         # Adjust maxlen in case of a CMF line
         if nme.startswith('UV_'):
             delta_wave_data = wave_data[1] - wave_data[0]
-            delta_save = delta_wave_data  
+            # Save x times higher resolution than the data
+            delta_save = delta_wave_data / 5.0  
             maxlen = (max(wave_data)-min(wave_data))/delta_save
 
         # Replace the model output by a low resolution spectrum
@@ -1032,29 +1033,40 @@ def get_xlum_out(moddir, mname):
 def ionizing_fluxes(lam, fnu, radius):
     c = 2.99792458e10
     h = 6.6260755e-27
-    rsun = 6.96e10
+    rsun = 6.957e10
 
-    nu = c/lam
-    integrand = np.pi*fnu/nu/h
+    nu = c/(lam * 1e-8)# Hz [per second]
+    photon_energy_nu = nu*h # Hz * ergs s^-1 = ergs [units of energy]
+
+    integrand = fnu/photon_energy_nu # ph s^-1 cm^-2 Hz^-1
     sorting = nu.argsort()
     nu = nu[sorting]
     integrand = integrand[sorting]
-    nulow_HI = c/912.
-    nulow_HeI = c/504.
-    nulow_HeII = c/228.
+    nulow_HI = c/(912.0e-8)
+    nulow_HeI = c/(504.0e-8)
+    nulow_HeII = c/(228.0e-8)
+
+    nip = 1000000
+    the_ip = interp1d(nu, integrand)
+    nu = np.linspace(min(nu), max(nu), nip)
+    integrand = the_ip(nu)
+
     nuHI, integrandHI = parallelcrop(nu, integrand, [], nulow_HI, 1e100)
     nuHeI, integrandHeI = parallelcrop(nu, integrand, [], nulow_HeI, 1e100)
     nuHeII, integrandHeII = parallelcrop(nu, integrand, [], nulow_HeII, 1e100)
-    q0 = np.trapz(integrandHI, nuHI)
-    Q0 = q0 * 4*np.pi * (radius*rsun)**2
+
+    # Integrate the integrand [ph s^-1 cm^-2 Hz^-1] over frequency: Hz
+    # ph s^-1 cm^-2  [number of photons per surface area per second]
+    q0 = np.trapz(integrandHI, nuHI) 
+    Q0 = q0 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq0 = round(np.log10(q0),3)
     logQ0 = round(np.log10(Q0),3)
     q1 = np.trapz(integrandHeI, nuHeI)
-    Q1 = q1 * 4*np.pi * (radius*rsun)**2
+    Q1 = q1 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq1 = round(np.log10(q1),3)
     logQ1 = round(np.log10(Q1),3)
     q2 = np.trapz(integrandHeII, nuHeII)
-    Q2 = q2 * 4*np.pi * (radius*rsun)**2
+    Q2 = q2 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq2 = round(np.log10(q2),3)
     logQ2 = round(np.log10(Q2),3)
 
@@ -1065,7 +1077,7 @@ def read_fluxcont(moddir, mname, rstar, rmax_fw):
        the ionising fluxes. 
        Input: path to model directory and model name,
            maximum radius of FW model, stellar radius (both in rsun).
-       Output: Q0, Q1, Q2
+       Output: q0, Q0, q1, Q1, q2, Q2
     """
     
     fluxcont = moddir + mname + '/FLUXCONT'
@@ -1091,8 +1103,6 @@ def read_fluxcont(moddir, mname, rstar, rmax_fw):
             lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount, 
                 skip_header=1, delimiter='').T[1:3]
             fnu = 10**logFnu # ergs/s/cm^2/Hz / RMAX^2
-            flam = 3.00* 1e18 * fnu / (lam**2) # ergs/s/cm^2/A /RMAX^2
-            flam = flam * stellar_surface # ergs/s/A /RMAX^2
             flam = flam * rmax_fw**2 # ergs/s/A
     
             q0, Q0, q1, Q1, q2, Q2 = ionizing_fluxes(lam, fnu, rstar)
