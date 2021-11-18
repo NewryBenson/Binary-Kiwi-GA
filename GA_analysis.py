@@ -267,7 +267,14 @@ def calculateP(params, nnormspec, chi2, normalize, be_verbose=False):
         if be_verbose:
             do_print('Not scaling Chi2, dividing by: ' + str(round(scaling, 3)),
                 be_verbose)
-    chi2 = (chi2 * degreesFreedom) / scaling
+    correction_factor = 1.0# 0.90
+    if correction_factor != 1.0:
+        print("!"*70)
+        print("\n\n\n       WARNING!!!!!!!! chi2 correction\n\n\n")
+        print("!"*70)
+        print("chi2 of all models artificially lowered in order to enlarge")
+        print("uncertainties\n\n\n")
+    chi2 = correction_factor * (chi2 * degreesFreedom) / scaling
     probs = np.zeros_like(chi2)
     try:
         for i in range(len(chi2)):
@@ -503,16 +510,19 @@ do_print('Min chi2: ' + str(min_redchi2_value), be_verbose)
 
 normspec_wave, normspec_flux, normspec_err = normspectrum.T
 
-specpoints = 0
-for i in range(len(line_norm_starts)):
-    npoints_line = len(parallelcrop(normspec_wave, normspec_flux,
-        line_norm_starts[i], line_norm_stops[i], normspec_err)[0])
-    specpoints = specpoints + npoints_line
+thedof = -1
+icount = -1
+while thedof == -1:
+    thedof = x['dof'].iloc[icount]
+    icount = icount + 1
+
+specpoints = thedof + len(params)
 
 do_print('best fitness : ' + str(max(x['fitness'])), be_verbose)
 do_print('best chi2    : ' + str(min(x['chi2'])), be_verbose)
-do_print('best red_chi2: ' + str(min(x['chi2'])/(specpoints - len(params))),
+do_print('best red_chi2: ' + str(min(x['chi2'])/thedof),
     be_verbose)
+
 probabilities = calculateP(params, specpoints, x['chi2'], True)
 x = x.assign(P=probabilities)
 
@@ -1124,8 +1134,6 @@ if make_convergence_analysis_plot:
         specpoints_utg = float(x['dof'].iloc[ct])
         ct = ct-1
     specpoints_utg = specpoints_utg + len(params)
-    min_p_1sig_utg = 0.317
-    min_p_2sig_utg = 0.0455
 
     xgen_utg = np.unique(x['gen'])#[:20]
 
@@ -1142,8 +1150,8 @@ if make_convergence_analysis_plot:
         x_utg = x_utg.assign(P=probabilities)
 
         best_utg = pd.Series.idxmax(x_utg['P'])
-        ind_1sig_utg = x_utg['P'] > min_p_1sig_utg
-        ind_2sig_utg = x_utg['P'] > min_p_2sig_utg
+        ind_1sig_utg = x_utg['P'] > min_p_1sig
+        ind_2sig_utg = x_utg['P'] > min_p_2sig
 
         for p, i in zip(params, range(len(params))):
             error_vals_1s_low[i].append(min(x_utg[p[0]][ind_1sig_utg]))
@@ -1346,8 +1354,6 @@ if make_fitness_fit_analysis_plot:
         error_vals_best.append([])
 
     specpoints_utg = x['dof'].iloc[-1] - len(params)
-    min_p_1sig_utg = 0.317
-    min_p_2sig_utg = 0.0455
 
     xgen_utg = np.unique(x['gen'])#[:20]
 
@@ -1364,8 +1370,8 @@ if make_fitness_fit_analysis_plot:
         x_utg = x_utg.loc[x_utg['P'] > 0.0005]
 
         best_utg = pd.Series.idxmax(x_utg['P'])
-        ind_1sig_utg = x_utg['P'] > min_p_1sig_utg
-        ind_2sig_utg = x_utg['P'] > min_p_2sig_utg
+        ind_1sig_utg = x_utg['P'] > min_p_1sig
+        ind_2sig_utg = x_utg['P'] > min_p_2sig
 
         if agen > 30:
             pc = 0
