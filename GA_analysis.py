@@ -26,7 +26,7 @@ import warnings
 import argparse
 
 from PyPDF2 import PdfFileMerger, PdfFileReader
-import cv2 #only required if make_paramspace_avi=True
+# import cv2 #only required if make_paramspace_avi=True
 import seaborn as sns
 import img2pdf # for saving the scatter plots (fitness vs parameter) in
                       # PNG and then transforming them to pdf (otherwise the
@@ -62,9 +62,13 @@ datapath = ppp.datapath_analysis
 
 parser = argparse.ArgumentParser()
 parser.add_argument('runname', help='Specify a run name')
-parser.add_argument('-set', help=('Which setting? "full", "short" or "manual"'
-    ", (default = short)"), default='short')
+# parser.add_argument('-set', help=('Which setting? "full", "short" or "manual"'
+#     ", (default = short)"), default='short')
 parser.add_argument('-prof', help='Make line profile plots',
+    action='store_true')
+parser.add_argument('-full', help='Make full report',
+    action='store_true')
+parser.add_argument('-manual', help='Make report with manual selection of plots',
     action='store_true')
 parser.add_argument('-verbose', help='Be verbose (default = False)',
     action='store_true')
@@ -82,7 +86,13 @@ args = parser.parse_args()
 # 'full' =  all possible plots (will take a while)
 # 'short' = does not generate correlation and fitness plots per line
 # 'manual' = only selected plots, to be specified below
-full_short_manual = args.set
+# full_short_manual = args.set
+if args.full:
+    full_short_manual = 'full'
+elif args.manual:
+    full_short_manual = 'manual'
+else:
+    full_short_manual = 'short'
 
 # Verbosity: if True, print progress, if False, print only errors/warnings
 be_verbose = args.verbose
@@ -268,6 +278,7 @@ def calculateP(params, nnormspec, chi2, normalize, be_verbose=False):
             do_print('Not scaling Chi2, dividing by: ' + str(round(scaling, 3)),
                 be_verbose)
     correction_factor = 1.0# 0.90
+    # correction_factor = 0.90
     if correction_factor != 1.0:
         print("!"*70)
         print("\n\n\n       WARNING!!!!!!!! chi2 correction\n\n\n")
@@ -399,7 +410,8 @@ else:
     no_radius_provided = False
     if be_verbose:
         print('Radius provided: computing derived parameters e.g. luminosity')
-if not 'xlum' in x.columns:
+xrayx = x[x['xlum'] != -1]
+if not 'xlum' in x.columns or len(xrayx) == 0:
     no_xlum_provided = True
     if be_verbose:
         print('No xlum provided: skipping derived parameter plot')
@@ -2011,7 +2023,7 @@ if make_lineprofiles_plot:
                                 # line axhlines are taken into account
                                 ax[arow, acol].plot(linewave_tmp, lineflux_tmp,
                                     color='#2a7f2a', # darkgreen!
-                                    zorder=len(best_models_dirs)+20, lw=3.0)
+                                    zorder=len(best_models_dirs)+2000, lw=3.0)
                                 np.savetxt(plotlineprofdir + linenames[lc]
                                     + '.best',
                                     np.array([linewave_tmp, lineflux_tmp]).T)
