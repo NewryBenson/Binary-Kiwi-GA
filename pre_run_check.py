@@ -1,6 +1,8 @@
 # Sarah Brands s.a.brands@uva.nl 25-02-2020
 # Script with some basic checks on Kiwi-GA input.
 #
+# Updated for use on Snellius by Frank Backs 18-10-2021
+#
 # Should be executed before starting a run:
 #  - Checks several aspects of the run setup
 #      * Prints report where errors are pointed out
@@ -19,14 +21,15 @@ import sys
 import math
 import numpy as np
 from matplotlib import pyplot as plt
-from PyPDF2 import PdfFileMerger
+# from PyPDF2 import PdfFileMerger
+from matplotlib.backends.backend_pdf import PdfPages
 
 import fastwind_wrapper as fw
 import population as pop
 
 jobscriptfile = 'run_kiwiGA.job' # name of job script file 
-hours_str = '28' # maximum wall time 
-n_cpu_core = 24.0 # number of CPUs per node
+hours_str = '72' # maximum wall time 
+n_cpu_core = 128.0 # number of CPUs per node
 username = 'sbrands'
 codedir = 'Kiwi-GA'
 
@@ -65,6 +68,8 @@ spectrum_fig2 = inputdir + 'spectrum_input2.pdf'
 
 pdfs = [param_fig, spectrum_fig]
 merged_report = inputdir + "pre_run_report.pdf"
+
+reportPDF = PdfPages(merged_report)
 
 report = inputdir + "pre_run_report.txt"
 
@@ -659,6 +664,7 @@ if checkdict['Step size'] == True:
 # Check wheter all lines in the line list are present in the 
 # FORMAL_INPUT master file 
 printsection('Formal Input')
+print(ctrldct["inicalcdir"])
 tf_formal = fw.create_FORMAL_INPUT(ctrldct["inicalcdir"], lineinfo[0], 
     linesetname,create=False)
 checkdict["FORMAL_INPUT"] = tf_formal
@@ -733,7 +739,7 @@ for i in range(ncols*nrows):
     stop = param_space[i][1]
     step = param_space[i][2]
     width = stop - start
-    nbin = ((width)/step) + 1
+    nbin = int(((width)/step) + 1)
     nbins.append(nbin)
     vlines = np.linspace(start, stop, nbin)
 
@@ -769,6 +775,8 @@ for i in range(ncols*nrows):
 fig.suptitle('Parameter space check: ' + run_name, fontsize=14)
 fig.tight_layout(rect=[0, 0.03, 1, 0.93])
 plt.savefig(param_fig)  
+reportPDF.savefig()
+plt.close()
 
 print('\n       >  Plotted parameter space and mutation distributions') 
 
@@ -870,6 +878,8 @@ for i in range(ncols*nrows):
 fig.suptitle('Spectrum check: ' + run_name, fontsize=14)
 fig.tight_layout(rect=[0, 0.03, 1, 0.93])
 plt.savefig(spectrum_fig)
+reportPDF.savefig()
+plt.close()
 
 bc = 0
 for ii in range(len(ll_check[1])):
@@ -920,17 +930,20 @@ if bc > 0:
     fig.tight_layout(rect=[0, 0.03, 1, 0.93])
     plt.savefig(spectrum_fig2)   
     pdfs.append(spectrum_fig2)
+    reportPDF.savefig()
         
 print('       >  Plotted spectrum and line selection') 
 
-merger = PdfFileMerger()
+# merger = PdfFileMerger()
 
-for pdf in pdfs:
-    merger.append(pdf)
+# for pdf in pdfs:
+#     merger.append(pdf)
+#
+# merger.write(merged_report)
+# merger.close()
 
-merger.write(merged_report)
-merger.close()
 
+reportPDF.close()
 for pdf in pdfs:
     os.system("rm " + pdf)
 
@@ -951,8 +964,9 @@ jobscriptlines = ['#!/bin/bash',
 'echo Do restart? $do_restart',
 '',
 '# Load modules',
-'module load 2019',
-'module load Python/3.6.6-intel-2018b',
+'module load 2021',
+'module load foss/2021a',
+'module load SciPy-bundle/2021.05-foss-2021a',
 '',
 '# Define paths',
 'scratch=/scratch-shared/' + username + '/${runname}/',
@@ -984,7 +998,7 @@ jobscriptlines = ['#!/bin/bash',
 '    echo ... creating output dir',
 '    mkdir -p output',
 '    echo ... starting run',
-'    srun -n $ncpu python3 kiwiGA.py ${runname}',
+'    srun --mpi=pmi2 -n $ncpu python3 kiwiGA.py ${runname}',
 'fi',
 '',
 'date',

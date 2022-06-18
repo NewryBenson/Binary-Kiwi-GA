@@ -19,5 +19,6 @@ test_scripts/*
 *.job_backup
 v10_HHeNCOPSi/*
 v10_MgSi_ini/*
+v106_HHeNCOPSi/*
 sed_correction_analysis.py
 sed_correction_indat.py

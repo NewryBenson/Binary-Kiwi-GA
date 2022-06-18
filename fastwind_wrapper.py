@@ -11,6 +11,7 @@ import glob
 import collections
 import magnitude_to_radius as m2r
 from scipy import interpolate
+import broaden as br
 
 def mkdir(path):
     """Create a directory"""
@@ -651,7 +652,7 @@ def prep_broad(linename, line_file, moddir):
         out_clean = 'skip'
     else:
         np.savetxt(out_clean, np.array([wave, flux]).T)
-    return out_clean
+    return out_clean, wave, flux
 
 def apply_broadening(mname, moddir, linenames, lineres):
     """Broaden the fastwind output with the instrumental profile,
@@ -685,20 +686,8 @@ def apply_broadening(mname, moddir, linenames, lineres):
             the_line_name = the_line_name.rpartition('OUT.')[-1]
         linenames_fromfile.append(the_line_name)
 
-    # If this command takes longer than 10 min than certainly
-    # something is wrong
-    do_broaden = 'timeout 10m python broaden.py -f '
-
     # Read in the broadening properties for the model.
     vrot, vmacro = np.genfromtxt(inicalcdir + 'broad.in')
-    if vmacro > 0:
-        do_macro = ' -m ' + str(vmacro)
-    else:
-        do_macro = ''
-    if vrot > 0:
-        do_vrot = ' -v ' + str(vrot)
-    else:
-        do_vrot = ''
 
     # Create a dictionary for lookup of resolving power per line
     resdct = dict(zip(linenames, lineres))
@@ -706,14 +695,14 @@ def apply_broadening(mname, moddir, linenames, lineres):
     # Loop through the OUT. files and apply broadening
     for linename, linefle in zip(linenames_fromfile, linefiles):
         # Convert to readable format
-        finput = prep_broad(linename, linefle, moddir)
+        finput, wave, flux = prep_broad(linename, linefle, moddir)
         if finput == 'skip':
             return 0
         # Lookup resolving power
-        do_res = ' -r ' + str(resdct[linename])
+        res = resdct[linename]
         # Apply broadening
-        broadcommand = do_broaden + finput + do_res + do_vrot + do_macro
-        os.system(broadcommand)
+        new_wave, new_flux = br.broaden_fwline(wave, flux, vrot, res, vmacro)
+        np.savetxt(finput + ".fin", np.array([new_wave, new_flux]).T)
 
     return 1
 
@@ -1047,7 +1036,7 @@ def ionizing_fluxes(lam, fnu, radius):
     nulow_HeII = c/(228.0e-8)
 
     nip = 1000000
-    the_ip = interp1d(nu, integrand)
+    the_ip = interpolate.interp1d(nu, integrand)
     nu = np.linspace(min(nu), max(nu), nip)
     integrand = the_ip(nu)
 
@@ -1103,7 +1092,7 @@ def read_fluxcont(moddir, mname, rstar, rmax_fw):
             lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount, 
                 skip_header=1, delimiter='').T[1:3]
             fnu = 10**logFnu # ergs/s/cm^2/Hz / RMAX^2
-            flam = flam * rmax_fw**2 # ergs/s/A
+            fnu = fnu * rmax_fw**2 # ergs/s/A
     
             q0, Q0, q1, Q1, q2, Q2 = ionizing_fluxes(lam, fnu, rstar)
             
