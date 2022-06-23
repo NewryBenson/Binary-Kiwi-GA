@@ -433,22 +433,37 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     add2indat(inl, dct, ['Na'], 'NA')
     add2indat(inl, dct, ['Ca'], 'CA')
 
+    # XRAYS - the parameter 'xpow' determines which X-ray prescription is used
+    #  -  if xpow <= -1000, the one of  Carneiro+16 is used. In this case 'fx'
+    #     is the X-ray volume filling fraction and 'xpow' has no meaning. 
+    #  -  if xpow > -1000 (but in practice > 0) the prescription of Puls+20 
+    #     is used. In this case 'fx' is n0, a normalisation of the power law, 
+    #     (see n_so in Puls+20 paper for details), and xpow the PL exponent. 
+
     # Include X-rays if the volume filling fraction fx > 0.0
     # (fx = 0 means no volume filled with X-rays, so exclude X-rays)
     # When fx > 1000, estimate it based on mdot and vinf:
-    if float(dct['fx']) > 1000:
-        dct = get_fx(dct)
-        # print('fx estimated = ' + dct['fx'])
-    # Use logscale fx value if that is in a valid range 
-    #  (only when it has set to such value in defaults, or in para-
-    #  meter space, it will)
-    if float(dct['logfx']) <= np.log10(16.0):
-        dct['fx'] = str(round(10**(float(dct['logfx'])),7))
-    # Add X-rays if the volume filling fraction > 0 *and* if teff is high
-    # enough X-rays are in FW not allowed for Teff<25000 (model will crash)
-    if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):    
-        inl.append('XRAYS ' + dct['fx'] + '\n')
-        add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx'])
+    if float(dct['xpow']) <= -1000:
+        # Use the Carneiro+16 prescription
+        if float(dct['fx']) > 1000:
+            dct = get_fx(dct)
+            # print('fx estimated = ' + dct['fx'])
+        # Use logscale fx value if that is in a valid range 
+        #  (only when it has set to such value in defaults, or in para-
+        #  meter space, it will)
+        if float(dct['logfx']) <= np.log10(16.0):
+            dct['fx'] = str(round(10**(float(dct['logfx'])),7))
+        # Add X-rays if the volume filling fraction > 0 *and* if teff is high
+        # enough X-rays are in FW not allowed for Teff<25000 (model will crash)
+        if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):    
+            inl.append('XRAYS ' + dct['fx'] + '\n')
+            add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx', 'xpow'])
+    else:
+        # Use the Puls+20 prescription
+
+        if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):
+            inl.append('XRAYS ' + dct['fx'] + '\n')
+            add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx', 'xpow'])
 
     # Write indat file
     with open(moddir + indat_file, 'w') as f:
@@ -608,17 +623,25 @@ def execute_fastwind(atom, fwtimeout, moddir):
     if sys.platform == "darwin":
         timeout = 'gtimeout ' + fwtimeout + ' '
     # ----------------------------------------------------
-    write_output = ' > pnlte.log'
+    write_output = ' &> pnlte.log'
     do_pnlte = timeout + pnlte_eo + write_output
 
     pformal_eo = 'timeout 15m ./pformalsol_' + atom + '.eo '
     read_input = '< formal.in '
-    write_output = ' > pformal.log'
+    write_output = ' &> pformal.log'
     do_pformal = pformal_eo + read_input + write_output
 
     os.system(do_pnlte)
     os.system(do_pformal)
-
+   
+    # Uncomment if you want to save the FW log files
+    #name_pnlte = 'pnlte_' + moddir.strip('/').split('/')[-2] + '.log'
+    #name_pform = 'pformal_' + moddir.strip('/').split('/')[-2] + '.log'
+    #os.system('mkdir -p ../../../pnlte/')
+    #os.system('mkdir -p ../../../pformal/')
+    #os.system('cp pnlte.log ../../../pnlte/' + name_pnlte)
+    #os.system('cp pformal.log ../../../pformal/' + name_pform)
+        
     # Return to the main directory
     # This is a weak point: if paths are changed 
     # elsewhere then we run into errors here. #FIXME

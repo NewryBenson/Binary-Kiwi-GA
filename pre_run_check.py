@@ -345,7 +345,8 @@ fastwind_def_complete = ['C',
                          'mx',
                          'gamx',
                          'Rinx',
-                         'logfx']
+                         'logfx',
+                         'xpow']
 
 for a_def_par in fastwind_def_complete:
     #if not ((a_def_par in defnames) or (a_def_par in param_names)):
@@ -506,6 +507,10 @@ else:
         print("X-rays included")
         if float(allp_dict['fx']) > 1000:
             print("   - Estimating fx with Kudritzki 1996 law")
+            if float(allp_dict['xpow']) > -1000:
+                print("   - Kudritzki estimate cannot be used with the Puls+20")
+                print("     prescription of X-rays!")
+                checkdict["Parameter space"] = False
         else:
             print("   - fx is fixed at " + allp_dict['fx'])
     if need_xraydetails:   
