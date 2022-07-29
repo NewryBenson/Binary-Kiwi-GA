@@ -223,7 +223,7 @@ if w_gauss_br > 0.50 and type_br == 'frac':
     print('WARNING: high value for w_gauss_br')
     checkdict["Mutation"] = False
     print('   - Broad gauss width : ' + str(w_gauss_br))
-if w_gauss_na > 2.00 and type_na == 'step':
+if w_gauss_na > 2.50 and type_na == 'step':
     print('WARNING: high value for w_gauss_na')
     checkdict["Mutation"] = False
     print('   - Narrow gauss width: ' + str(w_gauss_na))
@@ -329,6 +329,8 @@ fastwind_def_complete = ['C',
                          'logfclump',
                          'vclstart', 
                          'vclmax', 
+                         'vcl',
+                         'vcldummy',
                          'opthopf', 
                          'do_iescat',
                          'vclmax', 
@@ -593,6 +595,11 @@ if 'fic' not in param_names:
                 if fixed_pars[i] == -1:
                     tparams = ''
                     tlen = 0
+                    print('WARNING! fic in defaults set to -1')
+                    print('This means a fixed value of 10^-1 = 0.1 is used')
+                    print('If you intent to use optically thin clumping,')
+                    print('Set this value to 999 and rerun this script')
+                    input('If you intent to fix fic to 0.01, press enter')
                 else:
                     tparams = ''
                     tlen = -10
@@ -611,6 +618,13 @@ if 'fic' not in param_names:
     if tlen > 0:
         print('ERROR: no thick clumping, but ' + tparams + ' varied!')
         checkdict["Parameter space"] = False
+if 'vcl' in param_names and ('vclstart' in  param_names or 'vclmax' in param_names):
+    print('ERROR: vclstart and vcl cannot be fitted simultaneously')
+    print('       vcl > 0: use linear step function clumping law')
+    print('                vclstart not used')
+    print('       vcl > -1: use linear step function clumping law')
+    print('                vcl not used')
+    checkdict["Parameter space"] = False 
 
 if ctrldct["inicalcdir"].startswith("v11"):
     if 'fic' in param_names:
@@ -952,11 +966,20 @@ reportPDF.close()
 for pdf in pdfs:
     os.system("rm " + pdf)
 
+n_node = int((ctrldct["nind"]+1)/n_cpu_core)
+n_cpu = ctrldct["nind"]+1
+if n_node > 1:
+    ucx_string = "UCX_Settings='-x UCX_NET_DEVICES=mlx5_0:1'"
+    run_string = '    mpiexec -n $ncpu python3 kiwiGA.py ${runname}'
+else:
+    ucx_string = ''
+    run_string = '    srun --mpi=pmi2 -n $ncpu python3 kiwiGA.py ${runname}'
+
 jobscriptlines = ['#!/bin/bash',
 '#SBATCH --job-name=' + run_name,
 '#SBATCH -t ' + hours_str + ':00:00',
-'#SBATCH -N ' + str(int((ctrldct["nind"]+1)/n_cpu_core)),
-'#SBATCH -n ' + str(ctrldct["nind"]+1),
+'#SBATCH -N ' + str(n_node),
+'#SBATCH -n ' + str(n_cpu),
 '#SBATCH --no-requeue',
 '',
 'runname=' + run_name,
@@ -971,7 +994,8 @@ jobscriptlines = ['#!/bin/bash',
 '# Load modules',
 'module load 2021',
 'module load foss/2021a',
-'module load SciPy-bundle/2021.05-foss-2021a',
+#'module load SciPy-bundle/2021.05-foss-2021a',
+'module load Python/3.9.5-GCCcore-10.3.0',
 '',
 '# Define paths',
 'scratch=/scratch-shared/' + username + '/${runname}/',
@@ -994,16 +1018,18 @@ jobscriptlines = ['#!/bin/bash',
 'echo Starting run!',
 'date',
 '',
+ucx_string,
+'',
 '# Start run',
 'if [ "$do_restart" == "yes" ]',
 'then',
 '    echo ...restarting run',
-'    srun -n $ncpu python3 kiwiGA.py ${runname} -c',
+run_string + ' -c',
 'else',
 '    echo ... creating output dir',
 '    mkdir -p output',
 '    echo ... starting run',
-'    srun --mpi=pmi2 -n $ncpu python3 kiwiGA.py ${runname}',
+run_string,
 'fi',
 '',
 'date',

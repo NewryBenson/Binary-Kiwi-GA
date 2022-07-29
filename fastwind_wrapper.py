@@ -246,7 +246,8 @@ def get_vclmax(dct):
 
     if vclmax == -1.0:
         dct['vclmax'] = convert_vclmax_multi(vclstart, vclmax, 2.0)
-
+    elif vclmax == -2.0:
+        dct['vclmax'] = vclstart + 0.10
     # Varying vclmax is somewhat experimental
     elif vclmax >= 0.0 and vclmax <= 1.0:
         if vclmax < vclstart:
@@ -353,12 +354,33 @@ def clumping_type(ficval):
     when creating INDAT.DAT.
     """
 
-    if float(ficval) == -1:
+    if float(ficval) >= 999:
         clumptype = 'thin'
     else:
         clumptype = 'thick'
 
     return clumptype
+
+def fcl_rep_hillier(the_dct):
+    """ Get the maximum clumping parameter of the Hillier exponential
+        clumping law, assuming an outer radius of 120.0 Rsun.
+        Lower that slightly to be safe; this is the represetative clumping
+        parameter.
+    """
+    fcl_out = float(the_dct['fclump']) 
+    beta = float(the_dct['beta'])
+    vcl = float(the_dct['vcl'])
+    vinf = float(the_dct['vinf'])
+
+    r_in = 1.004
+    radius = np.linspace(r_in, 120.0, 1000)
+    velocity_r = vinf * (1-r_in/radius)**beta
+    fclump_rad = 1.*fcl_out + (1.-1.*fcl_out)*np.exp(-velocity_r/vcl)
+    max_fcl = np.max(fclump_rad)
+    fcl_rep = round(max_fcl*0.90,5)
+    if fcl_rep < 1.0:
+        fcl_rep = 1.0
+    return fcl_rep
 
 def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     defvals, defnames, radinfo, indat_file='INDAT.DAT', formal_in='formal.in',
@@ -409,15 +431,41 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     add2indat(inl, dct, ['micro', 'metallicity', 'lines', 'lines_in_model'])
     add2indat(inl, dct, ['enat_cor', 'expansion', 'set_first', 'set_step'])
 
+    # representative clumping parameter only required for exponential law.
+    # for the linear law the clumping factor can be used directly
+    # for the Hillier law this gives problems as fclout as given as input 
+    # is higher than the representative value
+    #dct['fclump_rep'] = str(round(float(dct['fclump'])*0.8,2)) # rough way
+    dct['fclump_rep'] = str(fcl_rep_hillier(dct)) # precise way
+
     # Wind clumping and porosity etc, optically thin or thick
     if clumptype == 'thin':
-        add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
+        
+        # If vcl > 0, use Hilliers exponential clumping law
+        if float(dct['vcl']) > 0:
+            add2indat(inl, dct, ['fclump_rep', 'fclump', 'vcl', 'vcldummy'])
+        # Else, use the linear step function law
+        else:
+            add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
     else:
+        # Assume fic was given in log scale if fic < 0
+        if float(dct['fic']) < 0.0:
+            dct['fic'] = str(round(10**(float(dct['fic'])),6))
+       
         inl.append('THICK\n')
-        add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
-        add2indat(inl, dct, ['fic', 'vclstart', 'vclmax'])
-        add2indat(inl, dct, ['fvel', 'vclstart', 'vclmax'])
-        add2indat(inl, dct, ['hclump', 'vclstart', 'vclmax'])
+        
+        # If vcl > 0, use Hilliers exponential clumping law
+        if float(dct['vcl']) > 0:
+            add2indat(inl, dct, ['fclump_rep', 'fclump', 'vcl', 'vcldummy'])
+            add2indat(inl, dct, ['fic', 'fic', 'vcl', 'vcldummy'])
+            add2indat(inl, dct, ['fvel', 'fvel', 'vcl', 'vcldummy'])
+            add2indat(inl, dct, ['hclump', 'hclump', 'vcl', 'vcldummy'])
+        # Else, use the linear step function law
+        else: 
+            add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
+            add2indat(inl, dct, ['fic', 'vclstart', 'vclmax'])
+            add2indat(inl, dct, ['fvel', 'vclstart', 'vclmax'])
+            add2indat(inl, dct, ['hclump', 'vclstart', 'vclmax'])
 
     # Abundances (will only be addded if not set to -1)
     # Mind the allcaps spelling that has to be written
@@ -613,8 +661,16 @@ def execute_fastwind(atom, fwtimeout, moddir):
     # Go to the model directory
     os.chdir(moddir)
 
+
     pnlte_eo = './pnlte_' + atom + '.eo '
-    timeout = 'timeout ' + fwtimeout + ' '
+    
+    # timeout based on cpu time 
+    fwtimeout = str(int(''.join(filter(str.isdigit, fwtimeout)))*60)
+    timeout = 'ulimit -t ' + fwtimeout + ' ; '
+    
+    # timeout based on actual time 
+    #timeout = 'timeout ' + fwtimeout + ' '
+
     # ----------------------------------------------------
     # This is a workaround for testing on OS X,
     # where the timeout command is not available, only
@@ -623,12 +679,15 @@ def execute_fastwind(atom, fwtimeout, moddir):
     if sys.platform == "darwin":
         timeout = 'gtimeout ' + fwtimeout + ' '
     # ----------------------------------------------------
-    write_output = ' &> pnlte.log'
+    write_output = ' > pnlte.log'
     do_pnlte = timeout + pnlte_eo + write_output
 
+    print('Start formalsol ' + moddir)
+    os.system('ls -lhtr pformalsol_' + atom + '.eo ')
+    os.system('pwd')
     pformal_eo = 'timeout 15m ./pformalsol_' + atom + '.eo '
     read_input = '< formal.in '
-    write_output = ' &> pformal.log'
+    write_output = ' > pformal.log'
     do_pformal = pformal_eo + read_input + write_output
 
     os.system(do_pnlte)
