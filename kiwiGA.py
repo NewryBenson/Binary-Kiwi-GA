@@ -240,7 +240,7 @@ while gencount <= cdict["ngen"]:
     pop.print_report(gencount, best_fitness, np.median(fitmeasures),
         cdict["be_verbose"])
 
-exit()    
+sys.exit()    
 pool.close()
 
 
