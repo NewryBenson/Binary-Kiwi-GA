@@ -12,7 +12,6 @@ old/*
 misc/*
 slurm/*
 slurm-*out
-*.jpg
 *.job
 example_input2/*
 test_scripts/*
