@@ -80,6 +80,9 @@ def magnitude_to_radius(teff, band, obsmag, zp_system, Tfrac=0.9,
     elif band == 'HST_555w':
         filterfile = 'HST_ACS_HRC.F555W.dat'
         waveunit = 'angstrom'
+    elif band == '2MASS_Ks':
+        filterfile = '2MASS_Ks.dat'
+        waveunit = 'angstrom'
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'
         waveunit = 'angstrom'

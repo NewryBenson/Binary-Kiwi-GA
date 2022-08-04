@@ -11,6 +11,7 @@ import glob
 import collections
 import magnitude_to_radius as m2r
 from scipy import interpolate
+import broaden as br
 
 def mkdir(path):
     """Create a directory"""
@@ -245,7 +246,8 @@ def get_vclmax(dct):
 
     if vclmax == -1.0:
         dct['vclmax'] = convert_vclmax_multi(vclstart, vclmax, 2.0)
-
+    elif vclmax == -2.0:
+        dct['vclmax'] = vclstart + 0.10
     # Varying vclmax is somewhat experimental
     elif vclmax >= 0.0 and vclmax <= 1.0:
         if vclmax < vclstart:
@@ -352,12 +354,33 @@ def clumping_type(ficval):
     when creating INDAT.DAT.
     """
 
-    if float(ficval) == -1:
+    if float(ficval) >= 999:
         clumptype = 'thin'
     else:
         clumptype = 'thick'
 
     return clumptype
+
+def fcl_rep_hillier(the_dct):
+    """ Get the maximum clumping parameter of the Hillier exponential
+        clumping law, assuming an outer radius of 120.0 Rsun.
+        Lower that slightly to be safe; this is the represetative clumping
+        parameter.
+    """
+    fcl_out = float(the_dct['fclump']) 
+    beta = float(the_dct['beta'])
+    vcl = float(the_dct['vcl'])
+    vinf = float(the_dct['vinf'])
+
+    r_in = 1.004
+    radius = np.linspace(r_in, 120.0, 1000)
+    velocity_r = vinf * (1-r_in/radius)**beta
+    fclump_rad = 1.*fcl_out + (1.-1.*fcl_out)*np.exp(-velocity_r/vcl)
+    max_fcl = np.max(fclump_rad)
+    fcl_rep = round(max_fcl*0.90,5)
+    if fcl_rep < 1.0:
+        fcl_rep = 1.0
+    return fcl_rep
 
 def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     defvals, defnames, radinfo, indat_file='INDAT.DAT', formal_in='formal.in',
@@ -408,15 +431,41 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     add2indat(inl, dct, ['micro', 'metallicity', 'lines', 'lines_in_model'])
     add2indat(inl, dct, ['enat_cor', 'expansion', 'set_first', 'set_step'])
 
+    # representative clumping parameter only required for exponential law.
+    # for the linear law the clumping factor can be used directly
+    # for the Hillier law this gives problems as fclout as given as input 
+    # is higher than the representative value
+    #dct['fclump_rep'] = str(round(float(dct['fclump'])*0.8,2)) # rough way
+    dct['fclump_rep'] = str(fcl_rep_hillier(dct)) # precise way
+
     # Wind clumping and porosity etc, optically thin or thick
     if clumptype == 'thin':
-        add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
+        
+        # If vcl > 0, use Hilliers exponential clumping law
+        if float(dct['vcl']) > 0:
+            add2indat(inl, dct, ['fclump_rep', 'fclump', 'vcl', 'vcldummy'])
+        # Else, use the linear step function law
+        else:
+            add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
     else:
+        # Assume fic was given in log scale if fic < 0
+        if float(dct['fic']) < 0.0:
+            dct['fic'] = str(round(10**(float(dct['fic'])),6))
+       
         inl.append('THICK\n')
-        add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
-        add2indat(inl, dct, ['fic', 'vclstart', 'vclmax'])
-        add2indat(inl, dct, ['fvel', 'vclstart', 'vclmax'])
-        add2indat(inl, dct, ['hclump', 'vclstart', 'vclmax'])
+        
+        # If vcl > 0, use Hilliers exponential clumping law
+        if float(dct['vcl']) > 0:
+            add2indat(inl, dct, ['fclump_rep', 'fclump', 'vcl', 'vcldummy'])
+            add2indat(inl, dct, ['fic', 'fic', 'vcl', 'vcldummy'])
+            add2indat(inl, dct, ['fvel', 'fvel', 'vcl', 'vcldummy'])
+            add2indat(inl, dct, ['hclump', 'hclump', 'vcl', 'vcldummy'])
+        # Else, use the linear step function law
+        else: 
+            add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
+            add2indat(inl, dct, ['fic', 'vclstart', 'vclmax'])
+            add2indat(inl, dct, ['fvel', 'vclstart', 'vclmax'])
+            add2indat(inl, dct, ['hclump', 'vclstart', 'vclmax'])
 
     # Abundances (will only be addded if not set to -1)
     # Mind the allcaps spelling that has to be written
@@ -432,22 +481,37 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     add2indat(inl, dct, ['Na'], 'NA')
     add2indat(inl, dct, ['Ca'], 'CA')
 
+    # XRAYS - the parameter 'xpow' determines which X-ray prescription is used
+    #  -  if xpow <= -1000, the one of  Carneiro+16 is used. In this case 'fx'
+    #     is the X-ray volume filling fraction and 'xpow' has no meaning. 
+    #  -  if xpow > -1000 (but in practice > 0) the prescription of Puls+20 
+    #     is used. In this case 'fx' is n0, a normalisation of the power law, 
+    #     (see n_so in Puls+20 paper for details), and xpow the PL exponent. 
+
     # Include X-rays if the volume filling fraction fx > 0.0
     # (fx = 0 means no volume filled with X-rays, so exclude X-rays)
     # When fx > 1000, estimate it based on mdot and vinf:
-    if float(dct['fx']) > 1000:
-        dct = get_fx(dct)
-        # print('fx estimated = ' + dct['fx'])
-    # Use logscale fx value if that is in a valid range 
-    #  (only when it has set to such value in defaults, or in para-
-    #  meter space, it will)
-    if float(dct['logfx']) <= np.log10(16.0):
-        dct['fx'] = str(round(10**(float(dct['logfx'])),7))
-    # Add X-rays if the volume filling fraction > 0 *and* if teff is high
-    # enough X-rays are in FW not allowed for Teff<25000 (model will crash)
-    if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):    
-        inl.append('XRAYS ' + dct['fx'] + '\n')
-        add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx'])
+    if float(dct['xpow']) <= -1000:
+        # Use the Carneiro+16 prescription
+        if float(dct['fx']) > 1000:
+            dct = get_fx(dct)
+            # print('fx estimated = ' + dct['fx'])
+        # Use logscale fx value if that is in a valid range 
+        #  (only when it has set to such value in defaults, or in para-
+        #  meter space, it will)
+        if float(dct['logfx']) <= np.log10(16.0):
+            dct['fx'] = str(round(10**(float(dct['logfx'])),7))
+        # Add X-rays if the volume filling fraction > 0 *and* if teff is high
+        # enough X-rays are in FW not allowed for Teff<25000 (model will crash)
+        if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):    
+            inl.append('XRAYS ' + dct['fx'] + '\n')
+            add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx', 'xpow'])
+    else:
+        # Use the Puls+20 prescription
+
+        if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):
+            inl.append('XRAYS ' + dct['fx'] + '\n')
+            add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx', 'xpow'])
 
     # Write indat file
     with open(moddir + indat_file, 'w') as f:
@@ -597,8 +661,16 @@ def execute_fastwind(atom, fwtimeout, moddir):
     # Go to the model directory
     os.chdir(moddir)
 
+
     pnlte_eo = './pnlte_' + atom + '.eo '
-    timeout = 'timeout ' + fwtimeout + ' '
+    
+    # timeout based on cpu time 
+    fwtimeout = str(int(''.join(filter(str.isdigit, fwtimeout)))*60)
+    timeout = 'ulimit -t ' + fwtimeout + ' ; '
+    
+    # timeout based on actual time 
+    #timeout = 'timeout ' + fwtimeout + ' '
+
     # ----------------------------------------------------
     # This is a workaround for testing on OS X,
     # where the timeout command is not available, only
@@ -610,6 +682,9 @@ def execute_fastwind(atom, fwtimeout, moddir):
     write_output = ' > pnlte.log'
     do_pnlte = timeout + pnlte_eo + write_output
 
+    print('Start formalsol ' + moddir)
+    os.system('ls -lhtr pformalsol_' + atom + '.eo ')
+    os.system('pwd')
     pformal_eo = 'timeout 15m ./pformalsol_' + atom + '.eo '
     read_input = '< formal.in '
     write_output = ' > pformal.log'
@@ -617,7 +692,15 @@ def execute_fastwind(atom, fwtimeout, moddir):
 
     os.system(do_pnlte)
     os.system(do_pformal)
-
+   
+    # Uncomment if you want to save the FW log files
+    #name_pnlte = 'pnlte_' + moddir.strip('/').split('/')[-2] + '.log'
+    #name_pform = 'pformal_' + moddir.strip('/').split('/')[-2] + '.log'
+    #os.system('mkdir -p ../../../pnlte/')
+    #os.system('mkdir -p ../../../pformal/')
+    #os.system('cp pnlte.log ../../../pnlte/' + name_pnlte)
+    #os.system('cp pformal.log ../../../pformal/' + name_pform)
+        
     # Return to the main directory
     # This is a weak point: if paths are changed 
     # elsewhere then we run into errors here. #FIXME
@@ -651,7 +734,7 @@ def prep_broad(linename, line_file, moddir):
         out_clean = 'skip'
     else:
         np.savetxt(out_clean, np.array([wave, flux]).T)
-    return out_clean
+    return out_clean, wave, flux
 
 def apply_broadening(mname, moddir, linenames, lineres):
     """Broaden the fastwind output with the instrumental profile,
@@ -685,20 +768,8 @@ def apply_broadening(mname, moddir, linenames, lineres):
             the_line_name = the_line_name.rpartition('OUT.')[-1]
         linenames_fromfile.append(the_line_name)
 
-    # If this command takes longer than 10 min than certainly
-    # something is wrong
-    do_broaden = 'timeout 10m python broaden.py -f '
-
     # Read in the broadening properties for the model.
     vrot, vmacro = np.genfromtxt(inicalcdir + 'broad.in')
-    if vmacro > 0:
-        do_macro = ' -m ' + str(vmacro)
-    else:
-        do_macro = ''
-    if vrot > 0:
-        do_vrot = ' -v ' + str(vrot)
-    else:
-        do_vrot = ''
 
     # Create a dictionary for lookup of resolving power per line
     resdct = dict(zip(linenames, lineres))
@@ -706,14 +777,14 @@ def apply_broadening(mname, moddir, linenames, lineres):
     # Loop through the OUT. files and apply broadening
     for linename, linefle in zip(linenames_fromfile, linefiles):
         # Convert to readable format
-        finput = prep_broad(linename, linefle, moddir)
+        finput, wave, flux = prep_broad(linename, linefle, moddir)
         if finput == 'skip':
             return 0
         # Lookup resolving power
-        do_res = ' -r ' + str(resdct[linename])
+        res = resdct[linename]
         # Apply broadening
-        broadcommand = do_broaden + finput + do_res + do_vrot + do_macro
-        os.system(broadcommand)
+        new_wave, new_flux = br.broaden_fwline(wave, flux, vrot, res, vmacro)
+        np.savetxt(finput + ".fin", np.array([new_wave, new_flux]).T)
 
     return 1
 
@@ -789,7 +860,8 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         # Adjust maxlen in case of a CMF line
         if nme.startswith('UV_'):
             delta_wave_data = wave_data[1] - wave_data[0]
-            delta_save = delta_wave_data  
+            # Save x times higher resolution than the data
+            delta_save = delta_wave_data / 5.0  
             maxlen = (max(wave_data)-min(wave_data))/delta_save
 
         # Replace the model output by a low resolution spectrum
@@ -1032,29 +1104,40 @@ def get_xlum_out(moddir, mname):
 def ionizing_fluxes(lam, fnu, radius):
     c = 2.99792458e10
     h = 6.6260755e-27
-    rsun = 6.96e10
+    rsun = 6.957e10
 
-    nu = c/lam
-    integrand = np.pi*fnu/nu/h
+    nu = c/(lam * 1e-8)# Hz [per second]
+    photon_energy_nu = nu*h # Hz * ergs s^-1 = ergs [units of energy]
+
+    integrand = fnu/photon_energy_nu # ph s^-1 cm^-2 Hz^-1
     sorting = nu.argsort()
     nu = nu[sorting]
     integrand = integrand[sorting]
-    nulow_HI = c/912.
-    nulow_HeI = c/504.
-    nulow_HeII = c/228.
+    nulow_HI = c/(912.0e-8)
+    nulow_HeI = c/(504.0e-8)
+    nulow_HeII = c/(228.0e-8)
+
+    nip = 1000000
+    the_ip = interpolate.interp1d(nu, integrand)
+    nu = np.linspace(min(nu), max(nu), nip)
+    integrand = the_ip(nu)
+
     nuHI, integrandHI = parallelcrop(nu, integrand, [], nulow_HI, 1e100)
     nuHeI, integrandHeI = parallelcrop(nu, integrand, [], nulow_HeI, 1e100)
     nuHeII, integrandHeII = parallelcrop(nu, integrand, [], nulow_HeII, 1e100)
-    q0 = np.trapz(integrandHI, nuHI)
-    Q0 = q0 * 4*np.pi * (radius*rsun)**2
+
+    # Integrate the integrand [ph s^-1 cm^-2 Hz^-1] over frequency: Hz
+    # ph s^-1 cm^-2  [number of photons per surface area per second]
+    q0 = np.trapz(integrandHI, nuHI) 
+    Q0 = q0 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq0 = round(np.log10(q0),3)
     logQ0 = round(np.log10(Q0),3)
     q1 = np.trapz(integrandHeI, nuHeI)
-    Q1 = q1 * 4*np.pi * (radius*rsun)**2
+    Q1 = q1 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq1 = round(np.log10(q1),3)
     logQ1 = round(np.log10(Q1),3)
     q2 = np.trapz(integrandHeII, nuHeII)
-    Q2 = q2 * 4*np.pi * (radius*rsun)**2
+    Q2 = q2 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq2 = round(np.log10(q2),3)
     logQ2 = round(np.log10(Q2),3)
 
@@ -1065,7 +1148,7 @@ def read_fluxcont(moddir, mname, rstar, rmax_fw):
        the ionising fluxes. 
        Input: path to model directory and model name,
            maximum radius of FW model, stellar radius (both in rsun).
-       Output: Q0, Q1, Q2
+       Output: q0, Q0, q1, Q1, q2, Q2
     """
     
     fluxcont = moddir + mname + '/FLUXCONT'
@@ -1091,9 +1174,7 @@ def read_fluxcont(moddir, mname, rstar, rmax_fw):
             lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount, 
                 skip_header=1, delimiter='').T[1:3]
             fnu = 10**logFnu # ergs/s/cm^2/Hz / RMAX^2
-            flam = 3.00* 1e18 * fnu / (lam**2) # ergs/s/cm^2/A /RMAX^2
-            flam = flam * stellar_surface # ergs/s/A /RMAX^2
-            flam = flam * rmax_fw**2 # ergs/s/A
+            fnu = fnu * rmax_fw**2 # ergs/s/A
     
             q0, Q0, q1, Q1, q2, Q2 = ionizing_fluxes(lam, fnu, rstar)
             

@@ -1,6 +1,8 @@
 # Sarah Brands s.a.brands@uva.nl 25-02-2020
 # Script with some basic checks on Kiwi-GA input.
 #
+# Updated for use on Snellius by Frank Backs 18-10-2021
+#
 # Should be executed before starting a run:
 #  - Checks several aspects of the run setup
 #      * Prints report where errors are pointed out
@@ -19,14 +21,15 @@ import sys
 import math
 import numpy as np
 from matplotlib import pyplot as plt
-from PyPDF2 import PdfFileMerger
+# from PyPDF2 import PdfFileMerger
+from matplotlib.backends.backend_pdf import PdfPages
 
 import fastwind_wrapper as fw
 import population as pop
 
 jobscriptfile = 'run_kiwiGA.job' # name of job script file 
 hours_str = '72' # maximum wall time 
-n_cpu_core = 24.0 # number of CPUs per node
+n_cpu_core = 128.0 # number of CPUs per node
 username = 'sbrands'
 codedir = 'Kiwi-GA'
 
@@ -65,6 +68,8 @@ spectrum_fig2 = inputdir + 'spectrum_input2.pdf'
 
 pdfs = [param_fig, spectrum_fig]
 merged_report = inputdir + "pre_run_report.pdf"
+
+reportPDF = PdfPages(merged_report)
 
 report = inputdir + "pre_run_report.txt"
 
@@ -218,7 +223,7 @@ if w_gauss_br > 0.50 and type_br == 'frac':
     print('WARNING: high value for w_gauss_br')
     checkdict["Mutation"] = False
     print('   - Broad gauss width : ' + str(w_gauss_br))
-if w_gauss_na > 2.00 and type_na == 'step':
+if w_gauss_na > 2.50 and type_na == 'step':
     print('WARNING: high value for w_gauss_na')
     checkdict["Mutation"] = False
     print('   - Narrow gauss width: ' + str(w_gauss_na))
@@ -324,6 +329,8 @@ fastwind_def_complete = ['C',
                          'logfclump',
                          'vclstart', 
                          'vclmax', 
+                         'vcl',
+                         'vcldummy',
                          'opthopf', 
                          'do_iescat',
                          'vclmax', 
@@ -340,7 +347,8 @@ fastwind_def_complete = ['C',
                          'mx',
                          'gamx',
                          'Rinx',
-                         'logfx']
+                         'logfx',
+                         'xpow']
 
 for a_def_par in fastwind_def_complete:
     #if not ((a_def_par in defnames) or (a_def_par in param_names)):
@@ -501,6 +509,10 @@ else:
         print("X-rays included")
         if float(allp_dict['fx']) > 1000:
             print("   - Estimating fx with Kudritzki 1996 law")
+            if float(allp_dict['xpow']) > -1000:
+                print("   - Kudritzki estimate cannot be used with the Puls+20")
+                print("     prescription of X-rays!")
+                checkdict["Parameter space"] = False
         else:
             print("   - fx is fixed at " + allp_dict['fx'])
     if need_xraydetails:   
@@ -583,6 +595,11 @@ if 'fic' not in param_names:
                 if fixed_pars[i] == -1:
                     tparams = ''
                     tlen = 0
+                    print('WARNING! fic in defaults set to -1')
+                    print('This means a fixed value of 10^-1 = 0.1 is used')
+                    print('If you intent to use optically thin clumping,')
+                    print('Set this value to 999 and rerun this script')
+                    input('If you intent to fix fic to 0.01, press enter')
                 else:
                     tparams = ''
                     tlen = -10
@@ -601,6 +618,13 @@ if 'fic' not in param_names:
     if tlen > 0:
         print('ERROR: no thick clumping, but ' + tparams + ' varied!')
         checkdict["Parameter space"] = False
+if 'vcl' in param_names and ('vclstart' in  param_names or 'vclmax' in param_names):
+    print('ERROR: vclstart and vcl cannot be fitted simultaneously')
+    print('       vcl > 0: use linear step function clumping law')
+    print('                vclstart not used')
+    print('       vcl > -1: use linear step function clumping law')
+    print('                vcl not used')
+    checkdict["Parameter space"] = False 
 
 if ctrldct["inicalcdir"].startswith("v11"):
     if 'fic' in param_names:
@@ -659,6 +683,7 @@ if checkdict['Step size'] == True:
 # Check wheter all lines in the line list are present in the 
 # FORMAL_INPUT master file 
 printsection('Formal Input')
+print(ctrldct["inicalcdir"])
 tf_formal = fw.create_FORMAL_INPUT(ctrldct["inicalcdir"], lineinfo[0], 
     linesetname,create=False)
 checkdict["FORMAL_INPUT"] = tf_formal
@@ -733,7 +758,7 @@ for i in range(ncols*nrows):
     stop = param_space[i][1]
     step = param_space[i][2]
     width = stop - start
-    nbin = ((width)/step) + 1
+    nbin = int(((width)/step) + 1)
     nbins.append(nbin)
     vlines = np.linspace(start, stop, nbin)
 
@@ -769,6 +794,8 @@ for i in range(ncols*nrows):
 fig.suptitle('Parameter space check: ' + run_name, fontsize=14)
 fig.tight_layout(rect=[0, 0.03, 1, 0.93])
 plt.savefig(param_fig)  
+reportPDF.savefig()
+plt.close()
 
 print('\n       >  Plotted parameter space and mutation distributions') 
 
@@ -870,6 +897,8 @@ for i in range(ncols*nrows):
 fig.suptitle('Spectrum check: ' + run_name, fontsize=14)
 fig.tight_layout(rect=[0, 0.03, 1, 0.93])
 plt.savefig(spectrum_fig)
+reportPDF.savefig()
+plt.close()
 
 bc = 0
 for ii in range(len(ll_check[1])):
@@ -920,25 +949,37 @@ if bc > 0:
     fig.tight_layout(rect=[0, 0.03, 1, 0.93])
     plt.savefig(spectrum_fig2)   
     pdfs.append(spectrum_fig2)
+    reportPDF.savefig()
         
 print('       >  Plotted spectrum and line selection') 
 
-merger = PdfFileMerger()
+# merger = PdfFileMerger()
 
-for pdf in pdfs:
-    merger.append(pdf)
+# for pdf in pdfs:
+#     merger.append(pdf)
+#
+# merger.write(merged_report)
+# merger.close()
 
-merger.write(merged_report)
-merger.close()
 
+reportPDF.close()
 for pdf in pdfs:
     os.system("rm " + pdf)
+
+n_node = int((ctrldct["nind"]+1)/n_cpu_core)
+n_cpu = ctrldct["nind"]+1
+if n_node > 1:
+    ucx_string = "UCX_Settings='-x UCX_NET_DEVICES=mlx5_0:1'"
+    run_string = '    mpiexec -n $ncpu python3 kiwiGA.py ${runname}'
+else:
+    ucx_string = ''
+    run_string = '    srun --mpi=pmi2 -n $ncpu python3 kiwiGA.py ${runname}'
 
 jobscriptlines = ['#!/bin/bash',
 '#SBATCH --job-name=' + run_name,
 '#SBATCH -t ' + hours_str + ':00:00',
-'#SBATCH -N ' + str(int((ctrldct["nind"]+1)/n_cpu_core)),
-'#SBATCH -n ' + str(ctrldct["nind"]+1),
+'#SBATCH -N ' + str(n_node),
+'#SBATCH -n ' + str(n_cpu),
 '#SBATCH --no-requeue',
 '',
 'runname=' + run_name,
@@ -951,8 +992,10 @@ jobscriptlines = ['#!/bin/bash',
 'echo Do restart? $do_restart',
 '',
 '# Load modules',
-'module load 2019',
-'module load Python/3.6.6-intel-2018b',
+'module load 2021',
+'module load foss/2021a',
+#'module load SciPy-bundle/2021.05-foss-2021a',
+'module load Python/3.9.5-GCCcore-10.3.0',
 '',
 '# Define paths',
 'scratch=/scratch-shared/' + username + '/${runname}/',
@@ -975,16 +1018,18 @@ jobscriptlines = ['#!/bin/bash',
 'echo Starting run!',
 'date',
 '',
+ucx_string,
+'',
 '# Start run',
 'if [ "$do_restart" == "yes" ]',
 'then',
 '    echo ...restarting run',
-'    srun -n $ncpu python3 kiwiGA.py ${runname} -c',
+run_string + ' -c',
 'else',
 '    echo ... creating output dir',
 '    mkdir -p output',
 '    echo ... starting run',
-'    srun -n $ncpu python3 kiwiGA.py ${runname}',
+run_string,
 'fi',
 '',
 'date',
