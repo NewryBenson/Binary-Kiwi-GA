@@ -126,7 +126,7 @@ def more_parameters(df, param_names, fix_names, fix_vals):
         df['logxlum'] = the_logxlum
         plist.append('logxlum')
 
-    if ('fx' not in df.columns) and (fix_dict['fx'] > 1000.0):
+    if ('fx' not in df.columns) and ('logfx' not in df.columns) and (fix_dict['fx'] > 1000.0):
         if 'mdot' in df.columns:
             the_mdot = df['mdot']
         else:
@@ -271,6 +271,7 @@ def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
 
     return df,best_uncertainty
 
+
 def titlepage(df, runname, params_error_1sig, params_error_2sig,
     the_pdf, param_names, maxgen, nind, linedct, which_sigma,
     deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars):
@@ -287,8 +288,10 @@ def titlepage(df, runname, params_error_1sig, params_error_2sig,
     fig, ax = plt.subplots(2,2,figsize=(12.5, 12.5),
         gridspec_kw={'height_ratios': [0.5, 3], 'width_ratios': [2, 8]})
 
-    if os.path.isfile('kiwi.jpg'):
-        ax[0,0].imshow(mpimg.imread('kiwi.jpg'))
+    path_to_ga = sys.argv[0].strip("GA_analysis.py")  # Not catch all, but catch most solution
+    if os.path.isfile(path_to_ga + 'kiwi.jpg'):
+        ax[0,0].imshow(mpimg.imread(path_to_ga + 'kiwi.jpg'))
+
     ax[0,0].axis('off')
     ax[0,1].axis('off')
     ax[1,0].axis('off')
@@ -319,8 +322,6 @@ def titlepage(df, runname, params_error_1sig, params_error_2sig,
     else:
         psig = params_error_1sig
         deriv_psig = deriv_params_error_1sig
-
-
 
     offs = 0.02
     yvalmax = 1.0
@@ -369,6 +370,97 @@ def titlepage(df, runname, params_error_1sig, params_error_2sig,
     plt.close()
 
     return the_pdf
+
+
+def titlepage_latex(df, runname, params_error_1sig, params_error_2sig,
+    the_pdf, param_names, maxgen, nind, linedct, which_sigma,
+    deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars):
+    """
+    Make a page with best fit parameters and errors
+    """
+    plt.rcParams['text.usetex'] = True
+
+    ncrash = len(df.copy()[df['chi2'] == 999999999])
+    ntot = len(df)
+    perccrash = round(100.0*ncrash/ntot,1)
+    minrchi2 = round(np.min(df['rchi2']),2)
+    nlines = len(linedct['name'])
+
+    fig, ax = plt.subplots(2,2,figsize=(12.5, 12.5),
+        gridspec_kw={'height_ratios': [0.5, 3], 'width_ratios': [2, 8]})
+
+    path_to_ga = sys.argv[0].strip("GA_analysis.py")  # Not catch all, but catch most solution
+    if os.path.isfile(path_to_ga + 'kiwi.jpg'):
+        ax[0,0].imshow(mpimg.imread(path_to_ga + 'kiwi.jpg'))
+
+    ax[0,0].axis('off')
+    ax[0,1].axis('off')
+    ax[1,0].axis('off')
+    ax[1,1].axis('off')
+
+    boldtext = {'ha':'left', 'va':'top', 'weight':'bold'}
+    normtext = {'ha':'left', 'va':'top'}
+    offs = 0.12
+    yvalmax = 0.9
+    ax[0,1].text(0.0, yvalmax, r'{\bf Run name}', **boldtext)
+    ax[0,1].text(0.25, yvalmax, runname, **normtext)
+    ax[0,1].text(0.0, yvalmax-1*offs, r'{\bf Best rchi2}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-1*offs, str(minrchi2), **normtext)
+    ax[0,1].text(0.0, yvalmax-2*offs, r'{\bf Generations}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-2*offs, str(maxgen), **normtext)
+    ax[0,1].text(0.0, yvalmax-3*offs, r'{\bf Individuals per gen}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-3*offs, str(nind), **normtext)
+    ax[0,1].text(0.0, yvalmax-4*offs, r'{\bf Total number of models}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-4*offs, str(ntot), **normtext)
+    ax[0,1].text(0.0, yvalmax-5*offs, r'{\bf Crashed models}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-5*offs, str(perccrash) + '\%', **normtext)
+    ax[0,1].text(0.0, yvalmax-6*offs, r'{\bf Number of lines}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-6*offs, str(nlines), **normtext)
+
+    if which_sigma == 2:
+        psig = params_error_2sig
+        deriv_psig = deriv_params_error_2sig
+    else:
+        psig = params_error_1sig
+        deriv_psig = deriv_params_error_1sig
+
+    table_text = r"\begin{tabular}{l|r|rr} "
+    table_text += r"{\bf Parameter} & {\bf Value} & {\bf min %i$\sigma$} & {\bf max %i$\sigma$} \rule{0pt}{2.6ex} \\ \hline " % (which_sigma, which_sigma)
+    for paramname in param_names:
+        table_text += r"%s & $%s_{-%s}^{+%s}$ & $%s$ & $%s$ \rule{0pt}{2.6ex} \\ " % (
+            paramname,
+            np.format_float_positional(psig[paramname][2], trim="-", precision=2),
+            np.format_float_positional(psig[paramname][2] - psig[paramname][0], trim="-", precision=2),
+            np.format_float_positional(psig[paramname][1] - psig[paramname][2], trim="-", precision=2),
+            np.format_float_positional(psig[paramname][0], trim="-", precision=2),
+            np.format_float_positional(psig[paramname][1], trim="-", precision=2))
+    table_text += r"\hline "
+    for paramname in deriv_pars:
+        table_text += r"%s & $%s_{-%s}^{+%s}$ & $%s$ & $%s$ \rule{0pt}{2.6ex} \\ " % (
+            fix_latex(paramname),
+            np.format_float_positional(deriv_psig[paramname][2], trim="-", precision=2),
+            np.format_float_positional(deriv_psig[paramname][2] - deriv_psig[paramname][0], trim="-", precision=2),
+            np.format_float_positional(deriv_psig[paramname][1] - deriv_psig[paramname][2], trim="-", precision=2),
+            np.format_float_positional(deriv_psig[paramname][0], trim="-", precision=2),
+            np.format_float_positional(deriv_psig[paramname][1], trim="-", precision=2))
+    table_text += r"\end{tabular}"
+    ax[1,1].text(0, 0.5, table_text, ha="left", va="center")
+
+    plt.tight_layout()
+    the_pdf.savefig(dpi=150)
+    plt.close()
+
+    # Stop using latex rendering to not mess with any other plots
+    plt.rcParams['text.usetex'] = False
+    return the_pdf
+
+
+def fix_latex(string):
+    """
+    removes underscores
+    """
+    string = string.replace("_", " ")
+    return string
 
 
 def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
@@ -436,6 +528,7 @@ def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
             alpha=0.70, zorder=0)
         ax[crow,ccol].axvspan(min2sig, max2sig, color='gold',
             alpha=0.25, zorder=0)
+        ax[crow, ccol].set_rasterized(True)
 
         # Set y-labels
         if ccol == 0:
@@ -448,8 +541,6 @@ def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
             ax[crow,ccol].set_ylim(-0.05*np.max(df_tot[yval]), np.max(df_tot[yval])*1.10)
         else:
             ax[crow,ccol].set_ylim(-0.05*np.max(df[yval]), np.max(df[yval])*1.10)
-        ax[crow,ccol].set_rasterized(True)
-
 
     # Colorbar
     cbar = plt.colorbar(scat0, orientation='horizontal')
@@ -483,6 +574,131 @@ def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
         return the_pdf
     else:
         return fig, ax
+
+
+def fitnessplot_per_parameter(df, xval, params_error_1sig, params_error_2sig,
+    the_pdf, line_names, param_space, maxgen,
+    which_cmap=plt.cm.viridis, save_jpg=False, df_tot=[]):
+
+    """
+    Plot the fitness as a function for each line for a given free parameter. This function
+    can be used for plotting the P-value, 1/rchi2 of all lines combined,
+    or for the fitness of individual lines (1/rchi2)
+    Also plots the fitness of the given parameter for all lines, and the sample density
+    """
+
+    # Only consider models that have not crashed
+    df = df[df['chi2'] < 999999999]
+
+    # Prepare colorbar
+    cmap = which_cmap
+    bounds = np.linspace(0, maxgen+1, maxgen+2)
+    norm = matplotlib.colors.BoundaryNorm(bounds, int(cmap.N*0.8))
+
+    # Determine the colors of the stacked histogram.
+    scalarmap = matplotlib.cm.ScalarMappable(norm=norm, cmap="viridis")
+    scalarmap._A = []
+    colors = [scalarmap.to_rgba(gen) for gen in range(maxgen)]
+
+    line_names = ["invrchi2"] + list(line_names) + [xval]
+    # Set up figure dimensions and subplots
+    ncols = 5
+    # nrows len(param_names)+1 to ensure space for the colorbar
+    nrows =int(math.ceil(1.0*(len(line_names)+1)/ncols))
+    nrows =max(nrows, 2)
+    ccol = ncols - 1
+    crow = -1
+    figsizefact = 2.5
+    fig, ax = plt.subplots(nrows, ncols, figsize=(figsizefact*ncols, figsizefact*nrows), sharey=False)
+
+    # Loop through lines
+    for i in range(ncols*nrows):
+
+        if ccol == ncols - 1:
+            ccol = 0
+            crow = crow + 1
+        else:
+            ccol = ccol + 1
+
+        if i >= (len(line_names)):
+            ax[crow,ccol].axis('off')
+            continue
+
+        # Make actual plots
+        if line_names[i] == "invrchi2":
+            ax[crow,ccol].set_title("All lines")
+        elif line_names[i] == xval:
+            ax[crow,ccol].set_title("Sample density")
+        else:
+            ax[crow,ccol].set_title(line_names[i])
+        if len(param_space) > 0:
+            ax[crow,ccol].set_xlim(param_space[0], param_space[1])
+
+        if xval != line_names[i]:
+            scat0 = ax[crow,ccol].scatter(df[xval], df[line_names[i]], c=df['gen'],
+                       cmap=cmap, norm=norm, s=10)
+        else:
+            hist_data = [df[xval][df['gen'] == i] for i in range(maxgen)]
+            ax[crow,ccol].hist(hist_data, bins=np.arange(param_space[0], param_space[1], param_space[2]),
+                               density=True, color=colors, stacked=True)
+            # ax[crow,ccol].hist(df[xval], bins=np.arange(param_space[0], param_space[1], param_space[2]),
+            #                    density=True)
+
+        min1sig = params_error_1sig[xval][0]
+        max1sig = params_error_1sig[xval][1]
+        min2sig = params_error_2sig[xval][0]
+        max2sig = params_error_2sig[xval][1]
+        bestfit = params_error_2sig[xval][2]
+
+        ax[crow,ccol].axvline(bestfit, color='orangered', lw=1.5)
+        ax[crow,ccol].axvspan(min1sig, max1sig, color='gold',
+            alpha=0.70, zorder=0)
+        ax[crow,ccol].axvspan(min2sig, max2sig, color='gold',
+            alpha=0.25, zorder=0)
+
+        # Set y-labels
+        if ccol == 0:
+            ax[crow,ccol].set_ylabel(r'1/$\chi^2_{\rm red}$')
+
+        if xval != line_names[i]:
+            if len(df_tot) > 0:
+                ax[crow,ccol].set_ylim(-0.05*np.max(df_tot[line_names[i]]), np.max(df_tot[line_names[i]])*1.10)
+            else:
+                ax[crow,ccol].set_ylim(-0.05*np.max(df[line_names[i]]), np.max(df[line_names[i]])*1.10)
+        ax[crow, ccol].set_rasterized(True)
+
+
+    # Colorbar
+    cbar = plt.colorbar(scat0, orientation='horizontal')
+    cbar.ax.set_title('Generation')
+
+    # Set title
+    if xval in ('invrchi2', 'P-value'):
+        if len(param_space) > 0:
+            plt.suptitle('All lines')
+        else:
+            plt.suptitle('All lines (derived parameters)')
+    else:
+        if len(param_space) > 0:
+            plt.suptitle(xval)
+        else:
+            plt.suptitle(xval + ' (derived parameters)')
+
+    # Tight layout and save plot
+    plt.tight_layout()
+    if nrows == 2:
+        plt.subplots_adjust(0.07, 0.07, 0.93, 0.85)
+    else:
+        plt.subplots_adjust(0.07, 0.07, 0.93, 0.90)
+
+    if not save_jpg:
+        the_pdf.savefig(dpi=100)
+        plt.close("all")
+
+        return the_pdf
+    else:
+        return fig, ax
+
 
 def lineprofiles(df, spectdct, linedct, savedmoddir,
     best_model_name, bestfamily_name, the_pdf, plotlineprofdir,
@@ -614,10 +830,10 @@ def correlationplot(the_pdf, df, corrpars):
                 ax[crow,ccol].axis('off')
             else:
                 ax[crow,ccol].scatter(dfs[pc1], dfs[pc2],
-                    c=dfs['invrchi2'],s=10)
+                    c=dfs['invrchi2'],s=10, rasterized=True)
                 pairlist.append(pair)
                 pairlist.append(pair[::-1])
-            ax[crow,ccol].set_rasterized(True)
+
             ax[crow,ccol].set_xlim(np.min(dfs[pc1]), np.max(dfs[pc1]))
             ax[crow,ccol].set_ylim(np.min(dfs[pc2]), np.max(dfs[pc2]))
     # Label axes
@@ -674,30 +890,23 @@ def fw_performance(the_pdf, df, controlfile):
     ax[0,1].set_ylabel('Count')
     ax[0,2].set_ylabel('Count')
 
-    sct1 = ax[1,0].scatter(np.log10(df['maxcorr']), df['maxit'], s=6, c=df['cputime']/60.0)
+    sct1 = ax[1,0].scatter(np.log10(df['maxcorr']), df['maxit'], s=6, c=df['cputime']/60.0, rasterized=True)
     ax[1,0].set_xlabel('log(Maximum correction)')
     ax[1,0].set_ylabel('Maximum iteration')
     cbar1 = plt.colorbar(sct1, ax=ax[1,0])
     cbar1.ax.set_title(r'CPU-time (min)', fontsize=9)
 
-    sct2 = ax[1,1].scatter(np.log10(df['maxcorr']), df['cputime']/60.0, s=6, c=df['maxit'])
+    sct2 = ax[1,1].scatter(np.log10(df['maxcorr']), df['cputime']/60.0, s=6, c=df['maxit'], rasterized=True)
     ax[1,1].set_xlabel('log(Maximum correction)')
     ax[1,1].set_ylabel('CPU-time (minutes)')
     cbar2 = plt.colorbar(sct2, ax=ax[1,1])
     cbar2.ax.set_title(r'Max. iteration', fontsize=9)
 
-    sct3 = ax[1,2].scatter(df['cputime']/60.0, df['maxit'], s=4, c=np.log10(df['maxcorr']))
+    sct3 = ax[1,2].scatter(df['cputime']/60.0, df['maxit'], s=4, c=np.log10(df['maxcorr']), rasterized=True)
     ax[1,2].set_xlabel('CPU-time (minutes)')
     ax[1,2].set_ylabel('Maximum iteration')
     cbar3 = plt.colorbar(sct3, ax=ax[1,2])
     cbar3.ax.set_title(r'log(Max. corr.)', fontsize=9)
-
-    ax[0,0].set_rasterized(True)
-    ax[0,1].set_rasterized(True)
-    ax[0,2].set_rasterized(True)
-    ax[1,0].set_rasterized(True)
-    ax[1,1].set_rasterized(True)
-    ax[1,2].set_rasterized(True)
 
     # Tight layout and save plot
     plt.tight_layout()
@@ -709,7 +918,6 @@ def fw_performance(the_pdf, df, controlfile):
 def convergence(the_pdf, df_orig, dof_tot, npspec, param_names, param_space,
     deriv_pars, maxgen):
 
-    evol_list = []
     evol_list_best = []
     evol_list_1sig_up = []
     evol_list_1sig_down = []

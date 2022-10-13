@@ -1,5 +1,6 @@
 # Script for visualising the run output of Kiwi-GA
 # Created by Sarah Brands @ 29 July 2022
+# Edited by Frank Backs & Sarah Brands
 
 import os
 import sys
@@ -17,6 +18,7 @@ import fastwind_wrapper as fw
 import paths as ppp
 from scipy import stats
 
+
 ###############################################################################
 #  Parse arguments (e.g. runname)
 ###############################################################################
@@ -30,6 +32,10 @@ parser.add_argument('-prof', help='Plot line profiles',
 parser.add_argument('-fast', help='Only make fitness plot and title page',
     action='store_true', default=False)
 parser.add_argument('-open', help='After making the report, open it.',
+    action='store_true', default=False)
+parser.add_argument('-param', help='Makes fitness per line plots grouped by parameter (not part of -full)',
+    action='store_true', default=False)
+parser.add_argument('-latex', help='Makes a latex table on the title page',
     action='store_true', default=False)
 args = parser.parse_args()
 
@@ -47,6 +53,8 @@ if args.full:
     pdfname = outpath + runname + '_full.pdf'
 if args.fast:
     pdfname = outpath + runname + '_fast.pdf'
+if args.param:
+    pdfname = outpath + runname + '_param.pdf'
 
 datapath = datapath + runname + '/'
 
@@ -84,7 +92,7 @@ df = pd.DataFrame(chi2data, columns=colnames)
 runids = np.genfromtxt(thechi2file, dtype='str').T[0]
 df['run_id'] = runids
 df['gen'] = df['gen'].astype(int)
-maxgen = np.max(df['gen'])
+maxgen = np.max(df['gen']) + 1
 df_orig = df.copy()
 
 # Read spectrum
@@ -133,13 +141,17 @@ best_model_name, bestfamily_name, params_error_1sig, \
 ###############################################################################
 
 with PdfPages(pdfname) as the_pdf:
-
     #  Create a title page with best fit parameters
-    the_pdf = fga.titlepage(df, runname, params_error_1sig, params_error_2sig,
-        the_pdf, param_names, maxgen, nind, linedct, 2,
-        deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
+    if not args.latex:
+        the_pdf = fga.titlepage(df, runname, params_error_1sig, params_error_2sig,
+            the_pdf, param_names, maxgen, nind, linedct, 2,
+            deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
+    else:
+        the_pdf = fga.titlepage_latex(df, runname, params_error_1sig, params_error_2sig,
+                                      the_pdf, param_names, maxgen, nind, linedct, 2,
+                                      deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
 
-    #  Create overview fitness plot (1/rchi2)
+    # Create overview fitness plot (1/rchi2)
     the_pdf = fga.fitnessplot(df, 'invrchi2', params_error_1sig,
         params_error_2sig, the_pdf, param_names, param_space,maxgen)
     the_pdf = fga.fitnessplot(df, 'invrchi2', deriv_params_error_1sig,
@@ -176,6 +188,12 @@ with PdfPages(pdfname) as the_pdf:
         for yval in linenames:
             the_pdf = fga.fitnessplot(df, yval, params_error_1sig,
                 params_error_2sig, the_pdf, param_names, param_space,maxgen)
+
+    if args.param:
+        for i, param in enumerate(param_names):
+            the_pdf = fga.fitnessplot_per_parameter(df, param, params_error_1sig, params_error_2sig, the_pdf, linenames,
+                                                    param_space[i], maxgen)
+
 
 print('Report saved to ' + pdfname)
 
