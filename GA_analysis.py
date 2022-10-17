@@ -37,6 +37,10 @@ parser.add_argument('-param', help='Makes fitness per line plots grouped by para
     action='store_true', default=False)
 parser.add_argument('-latex', help='Makes a latex table on the title page',
     action='store_true', default=False)
+parser.add_argument('-fitness', help='Add fitness plot with fitness (in addition to 1/chi2)',
+    action='store_true', default=False)
+parser.add_argument('-radius', help='Correct radius (compute FW model)',
+    action='store_true', default=False)
 args = parser.parse_args()
 
 runname = args.runname
@@ -48,6 +52,8 @@ print("Generating report for << " + runname + " >>")
 
 datapath = ppp.datapath_analysis
 outpath = ppp.outpath_analysis + runname + '/'
+fastwind_local = ppp.fastwind_local
+
 pdfname = outpath + runname + '.pdf'
 if args.full:
     pdfname = outpath + runname + '_full.pdf'
@@ -74,6 +80,7 @@ theparamfile = inputcopydir + 'parameter_space.txt'
 thespectrumfile = inputcopydir + 'spectrum.norm'
 theradiusfile = inputcopydir + 'radius_info.txt'
 thefwdefaultfile = inputcopydir + 'defaults_fastwind.txt'
+savebestfile = outpath + runname + '_bestvals.txt'
 
 ###############################################################################
 #  Read GA output files
@@ -120,6 +127,10 @@ dof_tot = npspec - nfree
 # Read number of individuals
 nind = int(np.genfromtxt(thecontrolfile, dtype='str')[0,1])
 
+# Do radius correction. This is always done if a FW model is present
+df = fga.radius_correction(df, fastwind_local, runname, thecontrolfile,
+    theradiusfile, datapath, outpath, comp_fw=args.radius)
+
 #  Compute derived parameters
 df, deriv_pars = fga.more_parameters(df, param_names, fix_names, fix_vals)
 
@@ -129,7 +140,7 @@ df, deriv_pars = fga.more_parameters(df, param_names, fix_names, fix_vals)
 
 # Compute uncertainties
 df, best_uncertainty = fga.get_uncertainties(df, dof_tot, npspec,
-    param_names, param_space, deriv_pars)
+    param_names, param_space, deriv_pars, incl_deriv=True)
 
 # Unpack all computed values
 best_model_name, bestfamily_name, params_error_1sig, \
@@ -156,6 +167,9 @@ with PdfPages(pdfname) as the_pdf:
         params_error_2sig, the_pdf, param_names, param_space,maxgen)
     the_pdf = fga.fitnessplot(df, 'invrchi2', deriv_params_error_1sig,
         deriv_params_error_2sig, the_pdf, deriv_pars,[],maxgen)
+    if args.fitness:
+        the_pdf = fga.fitnessplot(df, 'fitness', params_error_1sig,
+            params_error_2sig, the_pdf, param_names, param_space,maxgen)
 
     if args.prof:
         #  Create line profile plots
@@ -164,14 +178,28 @@ with PdfPages(pdfname) as the_pdf:
 
     if not args.fast:
         #  Create correlation plots
+
+        make_cplot_tmp = True
+        for apar in ['teff', 'logg', 'yhe', 'vrot', 'micro']:
+            if not apar in param_names:
+                make_cplot_tmp = False
+
         the_pdf = fga.correlationplot(the_pdf, df,
             ['teff', 'logg', 'yhe', 'vrot', 'micro'])
-        the_pdf = fga.correlationplot(the_pdf, df,
-            ['mdot', 'beta', 'fclump', 'fic', 'fvel', 'vcl'])
+
+        make_cplot_tmp = True
+        for apar in ['mdot', 'beta', 'fclump', 'fic', 'fvel', 'vcl', 'logxlum']:
+            if not apar in param_names and not apar in deriv_pars:
+                make_cplot_tmp = False
+
+        if make_cplot_tmp:
+            the_pdf = fga.correlationplot(the_pdf, df,
+                ['mdot', 'beta', 'fclump', 'fic', 'fvel', 'vcl', 'logxlum'])
 
         # Convergence plot
         the_pdf = fga.convergence(the_pdf, df_orig, dof_tot, npspec,
-            param_names,param_space, deriv_pars, maxgen)
+            param_names,param_space, deriv_pars, maxgen, runname,
+            fastwind_local, thecontrolfile, theradiusfile, datapath)
 
         # Fastwind performance plot
         the_pdf = fga.fw_performance(the_pdf, df, thecontrolfile)
@@ -189,11 +217,13 @@ with PdfPages(pdfname) as the_pdf:
             the_pdf = fga.fitnessplot(df, yval, params_error_1sig,
                 params_error_2sig, the_pdf, param_names, param_space,maxgen)
 
-    if args.param:
+    if args.param or args.full:
         for i, param in enumerate(param_names):
             the_pdf = fga.fitnessplot_per_parameter(df, param, params_error_1sig, params_error_2sig, the_pdf, linenames,
                                                     param_space[i], maxgen)
 
+fga.save_bestvals(param_names, deriv_pars, params_error_1sig, params_error_2sig,
+    deriv_params_error_1sig, deriv_params_error_2sig, savebestfile)
 
 print('Report saved to ' + pdfname)
 
