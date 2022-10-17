@@ -8,9 +8,11 @@ import numpy as np
 import pandas as pd
 import matplotlib
 from scipy import stats
+from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 import matplotlib.image as mpimg
 import fastwind_wrapper as fw
+import magnitude_to_radius as m2r
 
 def get_luminosity(Teff, radius):
     '''Calculate L in terms of log(L/Lsun), given Teff (K)
@@ -89,6 +91,153 @@ def get_vesc_eff(mass, radius, GammE):
     vesc_kms = vesc_cms*1e-5
 
     return vesc_kms
+
+def get_fw_fluxcont(fwdir):
+
+    rsun = 6.957e10 #cm
+    fluxcont = fwdir + 'FLUXCONT'
+    indat = fwdir + 'INDAT.DAT'
+
+    Rmax_fw_model = float(open(indat, 'r').readlines()[4].strip().split()[0])
+    rstar = float(open(indat, 'r').readlines()[3].strip().split()[-1])
+    mdot = float(open(indat, 'r').readlines()[5].strip().split()[0])
+
+    stellar_surface = 4*np.pi*(rsun*rstar)**2
+
+    # Look up the number of useful lines in the FLUXCONT
+    lcount = -2
+    for aline in open(fluxcont, 'r').readlines():
+        lcount = lcount+1
+        if len(aline.split()) == 1:
+            break
+
+    # Get FASTWIND spectrum
+    lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount,
+        skip_header=1, delimiter='').T[1:3]
+    fnu = 10**logFnu # ergs/s/cm^2/Hz / RMAX^2
+    flam = 3.00* 1e18 * fnu / (lam**2) # ergs/s/cm^2/A /RMAX^2
+    flam = flam * stellar_surface # ergs/s/A /RMAX^2
+    flam = flam * Rmax_fw_model**2 # ergs/s/A
+
+    sorting = lam.argsort()
+    lam = lam[sorting]
+    flam = flam[sorting]
+
+    return lam, flam
+
+def magnitude_to_radius_SED(sed_wave, sed_flam, band, obsmag, zp_system,
+    filterdir='filter_transmissions/'):
+
+    '''Compute the radius of the star based on a fastwind model
+    and observed (dereddened) absolute magnitude.
+
+    Input:
+     - band: name of the photometric band (string), see section
+       'Available photometric bands' at the start of of this
+       functions for which ones are included, and the
+       description below on how to add more.
+     - obsmag: the observed absolute magnitude in the given
+       band (float)
+     - zp_system: choose from 'vega', 'AB', 'ST' (string)
+     - filterdir: specify (relative) path to the directory
+       where the filter information is stored (string)
+
+    Output:
+     - Stellar radius in solar units (float)
+
+    NOTE ON ADDING NEW FILTERS
+
+    A useful resource for filter information is the
+    SVO Filter Profile Service:
+       http://svo2.cab.inta-csic.es/theory/fps/
+
+    When adding a new filter, please do the following:
+    1. Place an asci file with wavelengths and transmissions in
+       the filter directory (specified in the parameter
+       'filterdir'. In this file, lines with columns names or
+       headers should start with a '#'. Wavelengths can be in
+       Angstrom or nm (see next point).
+    2. Add an 'elif' statement in the code below under 'Available
+       photometric bands', in which you give the filter a clear
+       and descriptive name, and point to the transmission file.
+       Wavelength units in the data file can be either nanometers
+       or Angstrom, specify which one is used in the file in the
+       parameter 'waveunit' in the elif statement.
+    3. Add zero points to the file 'zero_points.dat' in the
+       filterdirectory. In the first column give the name of
+       the filter: use the same name as in point 2.
+
+    '''
+
+    ##########################################################
+    ###            Available photometric bands             ###
+    ##########################################################
+
+    if band == 'SPHERE_Ks':
+        filterfile = 'SPHERE_IRDIS_B_Ks.dat'
+        waveunit = 'nm'
+    elif band == 'HST_555w':
+        filterfile = 'HST_ACS_HRC.F555W.dat'
+        waveunit = 'angstrom'
+    elif band == '2MASS_Ks':
+        filterfile = '2MASS_Ks.dat'
+        waveunit = 'angstrom'
+    elif band == 'Johnson_V':
+        filterfile = 'GCPD_Johnson.V.dat'
+        waveunit = 'angstrom'
+    else:
+        print('Unknown value for <band>, exiting')
+        sys.exit()
+
+    ##########################################################
+    ###             Computation starts here                ###
+    ##########################################################
+
+    # Read transmission profile and convert units if necessary
+    filterfile = filterdir + filterfile
+    wave, trans = np.genfromtxt(filterfile, comments='#').T
+
+    if waveunit == 'nm':
+        nm_to_Angstrom = 10
+        wave = wave * nm_to_Angstrom
+    elif waveunit == 'angstrom':
+        pass
+    else:
+        print('Unknown value for <waveunit>, exiting')
+
+    # Get filter zero point
+    zpfile = filterdir + 'zero_points.dat'
+    zp_values = np.genfromtxt(zpfile, comments='#', dtype=str)
+    the_zero_point = ''
+    for afilter in zp_values:
+        if afilter[0] == band:
+            if zp_system == 'vega':
+                the_zero_point = float(afilter[1])
+            elif zp_system == 'AB':
+                the_zero_point = float(afilter[2])
+            elif zp_system == 'ST':
+                the_zero_point = float(afilter[3])
+            else:
+                print('Unknown value for <zp_system>, exiting')
+                sys.exit()
+    if the_zero_point == '':
+        print('Zero point for band ' + band + ' not found, exiting')
+        sys.exit()
+
+    sed_ip = interp1d(sed_wave, sed_flam)
+    F_lambda = sed_ip(wave)
+
+    rsun = 6.96e10
+    parsec_cm = 3.08567758e18
+    radius_ratio = 10*parsec_cm / rsun
+
+    filtered_flux = np.trapz(trans*F_lambda, wave)/np.trapz(trans, wave)
+    obsflux = m2r.magnitude_to_flux(obsmag, the_zero_point)
+    bolflux_10pc = obsflux/filtered_flux
+    luminosity = bolflux_10pc * (10*parsec_cm / rsun)**2
+    radius_rsun = luminosity**0.5
+
+    return radius_rsun
 
 def more_parameters(df, param_names, fix_names, fix_vals):
     fix_dict = dict(zip(fix_names, fix_vals))
@@ -203,6 +352,99 @@ def calculateP_noncent(chi2, degreesFreedom, lambda_nc):
             probs[i] = stats.ncx2.sf(chi2[i], degreesFreedom, lambda_nc)
     return probs
 
+def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
+    datapath, outpath, comp_fw):
+
+    radcorrfile = outpath + 'radius_correction.txt'
+    if os.path.isfile(radcorrfile):
+        os.system('rm ' + radcorrfile)
+
+    xbest = pd.Series.idxmin(df['rchi2'])
+    best_model_name = df['run_id'][xbest]
+    best_gen_name = best_model_name.split('_')[0]
+    bestmod_fw = fw_path + runname + '_' + best_model_name + '/'
+    if not os.path.isfile(bestmod_fw + 'FLUXCONT'):
+        if comp_fw:
+            os.system('mkdir -p ' + bestmod_fw)
+            savemoddir = datapath + 'saved/'
+            moddir = savemoddir + best_gen_name + '/' + best_model_name + '/'
+            modtar = savemoddir + best_gen_name + '/' + best_model_name + '.tar.gz'
+            if not os.path.isdir(moddir):
+                os.system('mkdir -p ' + moddir)
+                os.system('tar -xzf ' + modtar + ' -C ' + moddir + '/.')
+            the_best_indat = savemoddir + best_gen_name + '/' + best_model_name + '/INDAT.DAT'
+            os.system('cp ' + the_best_indat + ' ' + fw_path + '.')
+            fwindat = fw_path + 'INDAT.DAT'
+            pnlte_logfile = fw_path + runname + '_' + best_model_name + '.pnltelog'
+
+            with open(fwindat) as f:
+                lines = f.readlines()
+            lines[0] = "'" + runname + '_' + best_model_name + "'\n"
+            with open(fwindat, "w") as f:
+                f.writelines(lines)
+
+            for acontrl in np.genfromtxt(thecontrolfile,dtype='str'):
+                if acontrl[0] == 'modelatom':
+                    modelatom = acontrl[1]
+                    break
+            currentdir = os.getcwd()
+            os.chdir(fw_path)
+            print('Start FASTWIND Computation ...', 3*'\n...')
+            print('    ... pnlte output here: ' + pnlte_logfile)
+            runpnlte = './pnlte_' + modelatom + '.eo > ' + pnlte_logfile
+            os.system(runpnlte)
+            os.chdir(currentdir)
+            if os.path.isfile(bestmod_fw + 'FLUXCONT'):
+                corr_ready = True
+                os.system('rm ' + pnlte_logfile)
+
+            else:
+                print('\n\n\nERROR! fw model could not compute, check!\n\n\n')
+                corr_ready = False
+        else:
+            corr_ready = False
+    else:
+        corr_ready = True
+
+    if corr_ready:
+        lam, flam = get_fw_fluxcont(bestmod_fw)
+
+        fwindat = fw_path + 'INDAT.DAT'
+
+        rsun = 6.96e10 # cm
+        tefffact = 0.9
+        mod_rstar = float(open(fwindat, 'r').readlines()[3].strip().split()[-1])
+        stellar_surface = 4*np.pi*(rsun*mod_rstar)**2
+
+        magnitude_name = np.genfromtxt(theradiusfile, dtype='str')[0]
+        magnitude_value = np.genfromtxt(theradiusfile)[1]
+        magnitude_system = np.genfromtxt(theradiusfile, dtype='str')[2]
+
+        new_rad = magnitude_to_radius_SED(lam, flam/stellar_surface,
+            magnitude_name, magnitude_value, magnitude_system,
+            filterdir='filter_transmissions/')
+
+        radius_ratio = new_rad/mod_rstar
+
+        # Correct all radii with the percentual correction from the best fit model.
+        df['radius'] = df['radius']*radius_ratio
+
+        df['q0'] = 10**df['logq0']
+        df['logQ0'] = np.log10(df['q0']*4*np.pi*(rsun*df['radius'])**2)
+        df['q1'] = 10**df['logq1']
+        df['logQ1'] = np.log10(df['q1']*4*np.pi*(rsun*df['radius'])**2)
+        df['q2'] = 10**df['logq2']
+        df['logQ2'] = np.log10(df['q2']*4*np.pi*(rsun*df['radius'])**2)
+
+        with open(radcorrfile, 'w') as f:
+            f.write('# Radius corretion (= corrected radius/estimated radius\n')
+            f.write(str(radius_ratio) + '\n')
+
+    else:
+        print("WARNING! No radius correction done. ")
+
+    return df
+
 def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
     deriv_pars, incl_deriv=True):
 
@@ -230,15 +472,18 @@ def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
     params_error_1sig = {}
     params_error_2sig = {}
 
-    xbest = pd.Series.idxmax(df['P-value'])
+    xbest = pd.Series.idxmin(df['rchi2'])
+    best_model_name = df['run_id'][xbest]
+    best_gen_name = best_model_name.split('_')[0]
+
     if which_statistic in ('Pval_ncchi2', 'Pval_chi2'):
         min_p_1sig = 0.317
         min_p_2sig = 0.0455
         ind_1sig = df['P-value'] >= min_p_1sig
         ind_2sig = df['P-value'] >= min_p_2sig
     elif which_statistic == 'RMSEA':
-        min_p_1sig = minRMSEA*1.05
-        min_p_2sig = minRMSEA*1.10
+        min_p_1sig = minRMSEA*1.04
+        min_p_2sig = minRMSEA*1.09
         ind_1sig = df['RMSEA'] <= min_p_1sig
         ind_2sig = df['RMSEA'] <= min_p_2sig
 
@@ -258,7 +503,6 @@ def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
                 max(df[i][ind_2sig]), df[i][xbest]]
 
     # Read best model names (for plotting of line profiles)
-    best_model_name = df['run_id'][xbest]
     bestfamily_name = df['run_id'][ind_2sig].values
 
     if incl_deriv:
@@ -534,6 +778,8 @@ def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
         if ccol == 0:
             if yval == 'P-value':
                 ax[crow,ccol].set_ylabel('P-value')
+            elif yval == 'fitness':
+                ax[crow,ccol].set_ylabel('Fitness')
             else:
                 ax[crow,ccol].set_ylabel(r'1/$\chi^2_{\rm red}$')
 
@@ -916,7 +1162,7 @@ def fw_performance(the_pdf, df, controlfile):
     return the_pdf
 
 def convergence(the_pdf, df_orig, dof_tot, npspec, param_names, param_space,
-    deriv_pars, maxgen):
+    deriv_pars, maxgen, runname, fw_path, thecontrolfile, theradiusfile, datapath):
 
     evol_list_best = []
     evol_list_1sig_up = []
@@ -991,8 +1237,50 @@ def convergence(the_pdf, df_orig, dof_tot, npspec, param_names, param_space,
 
     return the_pdf
 
+def save_bestvals(param_names, deriv_pars, params_error_1sig, params_error_2sig,
+    deriv_params_error_1sig, deriv_params_error_2sig, savebest_txt):
+    """
+    Save best fit parameters and errors to text file
+    """
 
+    if os.path.isfile(savebest_txt):
+        os.system('rm ' + savebest_txt)
 
+    write_lines = []
+    rv = 4
+    lj = 10
+    lj0 = 15
+    for apar in param_names:
+        bestfit = params_error_2sig[apar][2]
+        low1sig = str(round(bestfit - params_error_1sig[apar][0], rv))
+        up1sig = str(round(params_error_1sig[apar][1] - bestfit, rv))
+        low2sig = str(round(bestfit - params_error_2sig[apar][0], rv))
+        up2sig = str(round(params_error_2sig[apar][1] - bestfit, rv))
+        bestfit = str(round(bestfit,rv))
+        savestr = (apar.ljust(lj0) + ' ' + bestfit.ljust(lj) + ' '
+            + low1sig.ljust(lj) + ' ' + up1sig.ljust(lj) + ' '
+            + low2sig.ljust(lj) + ' ' + up2sig.ljust(lj))
+        write_lines.append(savestr)
+
+    for apar in deriv_pars:
+        bestfit = deriv_params_error_2sig[apar][2]
+        low1sig = str(round(bestfit - deriv_params_error_1sig[apar][0], rv))
+        up1sig = str(round(deriv_params_error_1sig[apar][1] - bestfit, rv))
+        low2sig = str(round(bestfit - deriv_params_error_2sig[apar][0], rv))
+        up2sig = str(round(deriv_params_error_2sig[apar][1] - bestfit, rv))
+        bestfit = str(round(bestfit,rv))
+        savestr = (apar.ljust(lj0) + ' ' + bestfit.ljust(lj) + ' '
+            + low1sig.ljust(lj) + ' ' + up1sig.ljust(lj) + ' '
+            + low2sig.ljust(lj) + ' ' + up2sig.ljust(lj))
+        write_lines.append(savestr)
+
+    with open(savebest_txt, 'a') as myfile:
+        myfile.write('# Parameter'.ljust(lj0) + ' best'.ljust(lj+1) +
+            ' low1sig'.ljust(lj+1) + ' up1sig'.ljust(lj+1) +
+            ' low2sig'.ljust(lj+1) + ' up2sig' + '\n')
+        for aline in write_lines:
+            myfile.write(aline)
+            myfile.write('\n')
 
 
 
