@@ -252,9 +252,9 @@ if ctrldct["use_string"] in ('yes', 'y', 'True', True):
         print('WARNING: fracdouble_string should have a value 0 <= value <= 1.0, ' 
             '\n current value is ' + str(ctrldct["fracdouble_string"]))
 
-if not abs(float(ctrldct["mut_rate_max"]) - 1./len(param_names)) < 0.001:
-    print("1/nfree =! mut_rate_max")
-    print("   - 1/nfree      = "+ str(round(1./len(param_names),3)))
+if not abs(float(ctrldct["mut_rate_max"]) - 2./len(param_names)) < 0.001:
+    print("2/nfree =! mut_rate_max")
+    print("   - 2/nfree      = "+ str(round(2./len(param_names),3)))
     print("   - mut_rate_max = " + str(ctrldct["mut_rate_max"]))
     checkdict["Mutation"] = False
 
