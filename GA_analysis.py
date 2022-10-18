@@ -81,6 +81,7 @@ thespectrumfile = inputcopydir + 'spectrum.norm'
 theradiusfile = inputcopydir + 'radius_info.txt'
 thefwdefaultfile = inputcopydir + 'defaults_fastwind.txt'
 savebestfile = outpath + runname + '_bestvals.txt'
+save_dffile = outpath + 'df_' + runname + '.csv'
 
 ###############################################################################
 #  Read GA output files
@@ -225,6 +226,7 @@ with PdfPages(pdfname) as the_pdf:
 fga.save_bestvals(param_names, deriv_pars, params_error_1sig, params_error_2sig,
     deriv_params_error_1sig, deriv_params_error_2sig, savebestfile)
 
+df.to_csv(save_dffile)
 print('Report saved to ' + pdfname)
 
 if args.open:
