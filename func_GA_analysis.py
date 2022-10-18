@@ -363,16 +363,16 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
     best_model_name = df['run_id'][xbest]
     best_gen_name = best_model_name.split('_')[0]
     bestmod_fw = fw_path + runname + '_' + best_model_name + '/'
+    savemoddir = datapath + 'saved/'
+    the_best_indat = savemoddir + best_gen_name + '/' + best_model_name + '/INDAT.DAT'
     if not os.path.isfile(bestmod_fw + 'FLUXCONT'):
         if comp_fw:
             os.system('mkdir -p ' + bestmod_fw)
-            savemoddir = datapath + 'saved/'
             moddir = savemoddir + best_gen_name + '/' + best_model_name + '/'
             modtar = savemoddir + best_gen_name + '/' + best_model_name + '.tar.gz'
             if not os.path.isdir(moddir):
                 os.system('mkdir -p ' + moddir)
                 os.system('tar -xzf ' + modtar + ' -C ' + moddir + '/.')
-            the_best_indat = savemoddir + best_gen_name + '/' + best_model_name + '/INDAT.DAT'
             os.system('cp ' + the_best_indat + ' ' + fw_path + '.')
             fwindat = fw_path + 'INDAT.DAT'
             pnlte_logfile = fw_path + runname + '_' + best_model_name + '.pnltelog'
@@ -443,7 +443,7 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
     else:
         print("WARNING! No radius correction done. ")
 
-    return df
+    return df, the_best_indat
 
 def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
     deriv_pars, incl_deriv=True):
@@ -945,10 +945,9 @@ def fitnessplot_per_parameter(df, xval, params_error_1sig, params_error_2sig,
     else:
         return fig, ax
 
-
 def lineprofiles(df, spectdct, linedct, savedmoddir,
     best_model_name, bestfamily_name, the_pdf, plotlineprofdir,
-    save_jpg=False):
+    extra_fwmod, extra_mod, save_jpg=False):
     """
     Create plot with line profiles of best fitting models.
     In the background, plot the data.
@@ -1029,6 +1028,30 @@ def lineprofiles(df, spectdct, linedct, savedmoddir,
         ax[crow,ccol].plot(bestmodwave, bestmodflux, color='#1ca641', lw=2.4,
             alpha=1.0)
         ax[crow,ccol].set_xlim(linedct['left'][i], linedct['right'][i])
+        ax[crow,ccol].set_ylim(*ax[crow,ccol].get_ylim())
+
+        # plot an extra fastwind model
+        if not extra_fwmod == '/':
+            extramfile = extra_fwmod + linedct['name'][i] + '.prof'
+            if os.path.isfile(extramfile):
+                em_wave, em_flux = np.genfromtxt(extramfile).T
+                ax[crow,ccol].plot(em_wave, em_flux, color='dodgerblue', lw=2.4)
+                ax[crow,ccol].plot(bestmodwave, bestmodflux, color='red',
+                    lw=2.4,alpha=1.0)
+            else:
+                print(extramfile, 'not found')
+                ax[crow,ccol].plot(bestmodwave, bestmodflux, color='orangered',
+                    lw=2.4, alpha=1.0)
+
+        # plot another
+        if not extra_mod == '':
+            if os.path.isfile(extra_mod):
+                em_wave, em_flux = np.genfromtxt(extra_mod).T
+                ax[crow,ccol].plot(em_wave, em_flux, color='blue', lw=2.4)
+                ax[crow,ccol].plot(bestmodwave, bestmodflux, color='orangered',
+                    lw=2.4, alpha=1.0)
+            else:
+                print(extra_mod, 'not found')
 
     # Tight layout and save plot
     plt.tight_layout()

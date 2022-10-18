@@ -18,7 +18,6 @@ import fastwind_wrapper as fw
 import paths as ppp
 from scipy import stats
 
-
 ###############################################################################
 #  Parse arguments (e.g. runname)
 ###############################################################################
@@ -41,6 +40,16 @@ parser.add_argument('-fitness', help='Add fitness plot with fitness (in addition
     action='store_true', default=False)
 parser.add_argument('-radius', help='Correct radius (compute FW model)',
     action='store_true', default=False)
+parser.add_argument('-em', help='Add an extra FW model to the line profile plots. '  +
+    'Supply here the path to the spectrum, which should be an asci file  ' +
+    'containing two columns (wavelength (angstrom) and normalised flux).',
+    default='')
+parser.add_argument('-efm', help='Add an extra FW model to the line  ' +
+    'profile plots. Supply here the path to the directory. The directory should ' +
+    'contain (broadened) line profiles with names as in the GA run + ending ' +
+    'on .prof, e.g. "HALPHA.prof". The files schould be asci format and have ' +
+    'two columns: wavelength (angstrom) and normalised flux. ',
+    default='')
 args = parser.parse_args()
 
 runname = args.runname
@@ -82,6 +91,12 @@ theradiusfile = inputcopydir + 'radius_info.txt'
 thefwdefaultfile = inputcopydir + 'defaults_fastwind.txt'
 savebestfile = outpath + runname + '_bestvals.txt'
 save_dffile = outpath + 'df_' + runname + '.csv'
+savebestindatfile = outpath + 'INDAT.DAT'
+
+extra_fwmod = args.efm
+if not extra_fwmod.endswith('/'):
+    extra_fwmod = extra_fwmod + '/'
+extra_mod = args.em
 
 ###############################################################################
 #  Read GA output files
@@ -129,7 +144,7 @@ dof_tot = npspec - nfree
 nind = int(np.genfromtxt(thecontrolfile, dtype='str')[0,1])
 
 # Do radius correction. This is always done if a FW model is present
-df = fga.radius_correction(df, fastwind_local, runname, thecontrolfile,
+df, best_indat = fga.radius_correction(df, fastwind_local, runname, thecontrolfile,
     theradiusfile, datapath, outpath, comp_fw=args.radius)
 
 #  Compute derived parameters
@@ -175,7 +190,8 @@ with PdfPages(pdfname) as the_pdf:
     if args.prof:
         #  Create line profile plots
         the_pdf = fga.lineprofiles(df, spectdct, linedct, savedmoddir,
-            best_model_name, bestfamily_name, the_pdf, plotlineprofdir)
+            best_model_name, bestfamily_name, the_pdf,
+            plotlineprofdir, extra_fwmod, extra_mod)
 
     if not args.fast:
         #  Create correlation plots
@@ -226,6 +242,7 @@ with PdfPages(pdfname) as the_pdf:
 fga.save_bestvals(param_names, deriv_pars, params_error_1sig, params_error_2sig,
     deriv_params_error_1sig, deriv_params_error_2sig, savebestfile)
 
+os.system('cp ' + best_indat + ' ' + savebestindatfile)
 df.to_csv(save_dffile)
 print('Report saved to ' + pdfname)
 
