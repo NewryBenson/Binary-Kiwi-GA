@@ -58,11 +58,11 @@ def read_paramspace(param_source):
 
 def read_control_pars(control_source):
     """ Read the control parameters from text file """
-    
+
     # Read values from file and put into dictionary
     keys, vals = np.genfromtxt(control_source, dtype=str, comments='#').T
     ctrldct = dict(zip(keys, vals))
-    
+
     # Convert the numeric files to integers or floats
     ctrldct["nind"] = int(ctrldct["nind"])
     ctrldct["ngen"] = int(ctrldct["ngen"])
@@ -85,12 +85,12 @@ def read_control_pars(control_source):
     ctrldct["fit_cutoff_max_charb"] = float(ctrldct["fit_cutoff_max_charb"])
     ctrldct["cutoff_increase_genv"] = float(ctrldct["cutoff_increase_genv"])
     ctrldct["cutoff_decrease_genv"] = float(ctrldct["cutoff_decrease_genv"])
-    
+
     n_parent = ctrldct["nind"] * ctrldct["ratio_po"]
     ctrldct["n_keep_parent"] = math.ceil(n_parent * ctrldct["f_parent"])
     f_keep_offspring = ctrldct["f_parent"] * ctrldct["ratio_po"]
     ctrldct["n_keep_offspring"] = n_parent - ctrldct["n_keep_parent"]
-    
+
     return ctrldct
 
 def get_defvals(the_filename, freenames, fixednames):
@@ -174,7 +174,7 @@ def get_radius(dct, radinfo):
 
 def get_vinf(dct):
     """If the vinf is not a fixed or free (i.e. if its value is set
-    at vinf = -1 in the input, then adapt a value of x times the escape 
+    at vinf = -1 in the input, then adapt a value of x times the escape
     velocity where x depends on temperature. Otherwise leave unchanged.
     """
 
@@ -206,7 +206,7 @@ def get_vinf(dct):
     return dct
 
 def convert_vclmax_scale(vclstart, vclextend):
-    """ If vclmax is a free parameter, then in case that it is 
+    """ If vclmax is a free parameter, then in case that it is
     lower than vstart, get another vclmax value by scaling vclstart
     """
     maxrange = 1.0 - vclstart
@@ -216,7 +216,7 @@ def convert_vclmax_scale(vclstart, vclextend):
     return vclmax
 
 def convert_vclmax_multi(vclstart, vclextend, factor):
-    """ If vclmax is a free parameter, then in case that it is 
+    """ If vclmax is a free parameter, then in case that it is
     lower than vstart, get another vclmax value by multiplying vclstart
     """
     vclmax = min(round(factor * vclstart, 4), 1.0)
@@ -225,8 +225,8 @@ def convert_vclmax_multi(vclstart, vclextend, factor):
     return vclmax
 
 def convert_vclmax_add(vclstart, vclextend, addition):
-    """ If vclmax is a free parameter, then in case that it is 
-    lower than vstart, get another vclmax value by adding a value 
+    """ If vclmax is a free parameter, then in case that it is
+    lower than vstart, get another vclmax value by adding a value
     to vclstart.
     """
     vclmax = min(round(vclstart + addition, 4), 1.0)
@@ -235,10 +235,10 @@ def convert_vclmax_add(vclstart, vclextend, addition):
     return vclmax
 
 def get_vclmax(dct):
-    """ If the value for vclmax is -1, we adopt 2*vclstart 
+    """ If the value for vclmax is -1, we adopt 2*vclstart
         If it can vary freely (between e.g. 0 and 1.0) then it is
         checked that the chosen value is not lower than vstart. If
-        it is, then it is adapted to a physical value. 
+        it is, then it is adapted to a physical value.
     """
 
     vclstart = float(dct['vclstart'])
@@ -254,7 +254,7 @@ def get_vclmax(dct):
             # If vclmax is too low (i.e. lower than vclstart), the value
             # is adapted by choosing vclmax = vclstart + 0.05
             dct['vclmax'] = convert_vclmax_add(vclstart, vclmax, 0.05)
-            
+
             # Alternative ways of adapting the vclmax value:
             #   dct['vclmax'] = convert_vclmax_scale(vclstart, vclmax)
             #   dct['vclmax'] = convert_vclmax_multi(vclstart, vclmax, 2.0)
@@ -262,10 +262,10 @@ def get_vclmax(dct):
             # tion leads to a too low vclmax value, the value that is
             # eventually used, is closer to the original value than in the
             # case of scaling or multiplication, where the new value is
-            # closer to random. 
+            # closer to random.
 
         else:
-            # If it isn't smaller than vclstart, then vclmax is kept 
+            # If it isn't smaller than vclstart, then vclmax is kept
             # to the value picked originally by GA
             pass
 
@@ -273,9 +273,9 @@ def get_vclmax(dct):
 
 def check_windturb(dct):
     """ Check that the wind turbulence (maximum turbulence at vinf)
-        is not higher than the atmospheric turbulence. 
-        The wind turbulence can be given in units of vinf (when it 
-        is between 0.0 and 1.0) or in km/s. 
+        is not higher than the atmospheric turbulence.
+        The wind turbulence can be given in units of vinf (when it
+        is between 0.0 and 1.0) or in km/s.
     """
 
     windturb = float(dct['windturb'])
@@ -287,7 +287,7 @@ def check_windturb(dct):
     else:
         windturb_abs = windturb
 
-    if windturb_abs < micro: 
+    if windturb_abs < micro:
         windturb = micro
     else:
         windturb = windturb_abs
@@ -322,7 +322,7 @@ def calculate_mdot(dct, significant_digits=6):
 
     return dct
 
-def get_fx(dct):
+def get_fx_obs(dct):
     """ Estimates fx based on the Mdot and vinf, based on the
     power law of Kudritzki, Palsa, Feldmeier et al. (1996). This power law
     is extrapolated also outside where Kudritzki+96 have data points.
@@ -341,6 +341,34 @@ def get_fx(dct):
 
     # Relation from Kudritzki, Palsa, Feldmeier et al. (1996)
     logfx = -5.45 - 1.05*logmdotvinf
+    fx = round(10**(logfx),8)
+
+    dct['fx'] = str(fx)
+
+    return dct
+
+def get_fx_theory(dct):
+    """ Estimates fx based on Mdot, vinf, and radius. This relation is
+        based on the analysis of FW model output.
+
+    Input:
+        - Dictionary with parameter values in the form of strings
+    Output:
+        - Dictionary with parameter values, updated with fx
+    """
+
+    msun = 1.989e33
+    rsun = 6.955e10
+    year = 365*24*60*60
+    mdot = 10**float(dct['mdot'])*msun/year # to g/s
+    vinf = float(dct['vinf'])*1e5 # to cm
+    radius = float(dct['radius'])*rsun # to cm
+
+    # Compute log10 of wind density in cgs units
+    logWD = np.log10(mdot/(4*np.pi * radius**2 *vinf))
+
+    # Relation to get fx that gives approx Lx = 10**-7 Lstar by Brands
+    logfx = -0.5541 + 1.2442*logWD + 0.0851*logWD**2
     fx = round(10**(logfx),8)
 
     dct['fx'] = str(fx)
@@ -367,7 +395,7 @@ def fcl_rep_hillier(the_dct):
         Lower that slightly to be safe; this is the represetative clumping
         parameter.
     """
-    fcl_out = float(the_dct['fclump']) 
+    fcl_out = float(the_dct['fclump'])
     beta = float(the_dct['beta'])
     vcl = float(the_dct['vcl'])
     vinf = float(the_dct['vinf'])
@@ -409,7 +437,7 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     clumptype = clumping_type(dct['fic'])
 
     # If vclmax = -1, get a value based on vclstart
-    # If vclmax is free, then adapt the range so that 
+    # If vclmax is free, then adapt the range so that
     # it matched vclstart.
     dct = get_vclmax(dct)
 
@@ -433,14 +461,14 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
 
     # representative clumping parameter only required for exponential law.
     # for the linear law the clumping factor can be used directly
-    # for the Hillier law this gives problems as fclout as given as input 
+    # for the Hillier law this gives problems as fclout as given as input
     # is higher than the representative value
     #dct['fclump_rep'] = str(round(float(dct['fclump'])*0.8,2)) # rough way
     dct['fclump_rep'] = str(fcl_rep_hillier(dct)) # precise way
 
     # Wind clumping and porosity etc, optically thin or thick
     if clumptype == 'thin':
-        
+
         # If vcl > 0, use Hilliers exponential clumping law
         if float(dct['vcl']) > 0:
             add2indat(inl, dct, ['fclump_rep', 'fclump', 'vcl', 'vcldummy'])
@@ -451,9 +479,9 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
         # Assume fic was given in log scale if fic < 0
         if float(dct['fic']) < 0.0:
             dct['fic'] = str(round(10**(float(dct['fic'])),6))
-       
+
         inl.append('THICK\n')
-        
+
         # If vcl > 0, use Hilliers exponential clumping law
         if float(dct['vcl']) > 0:
             add2indat(inl, dct, ['fclump_rep', 'fclump', 'vcl', 'vcldummy'])
@@ -461,7 +489,7 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
             add2indat(inl, dct, ['fvel', 'fvel', 'vcl', 'vcldummy'])
             add2indat(inl, dct, ['hclump', 'hclump', 'vcl', 'vcldummy'])
         # Else, use the linear step function law
-        else: 
+        else:
             add2indat(inl, dct, ['fclump', 'vclstart', 'vclmax'])
             add2indat(inl, dct, ['fic', 'vclstart', 'vclmax'])
             add2indat(inl, dct, ['fvel', 'vclstart', 'vclmax'])
@@ -483,10 +511,10 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
 
     # XRAYS - the parameter 'xpow' determines which X-ray prescription is used
     #  -  if xpow <= -1000, the one of  Carneiro+16 is used. In this case 'fx'
-    #     is the X-ray volume filling fraction and 'xpow' has no meaning. 
-    #  -  if xpow > -1000 (but in practice > 0) the prescription of Puls+20 
-    #     is used. In this case 'fx' is n0, a normalisation of the power law, 
-    #     (see n_so in Puls+20 paper for details), and xpow the PL exponent. 
+    #     is the X-ray volume filling fraction and 'xpow' has no meaning.
+    #  -  if xpow > -1000 (but in practice > 0) the prescription of Puls+20
+    #     is used. In this case 'fx' is n0, a normalisation of the power law,
+    #     (see n_so in Puls+20 paper for details), and xpow the PL exponent.
 
     # Include X-rays if the volume filling fraction fx > 0.0
     # (fx = 0 means no volume filled with X-rays, so exclude X-rays)
@@ -494,16 +522,17 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
     if float(dct['xpow']) <= -1000:
         # Use the Carneiro+16 prescription
         if float(dct['fx']) > 1000:
-            dct = get_fx(dct)
-            # print('fx estimated = ' + dct['fx'])
-        # Use logscale fx value if that is in a valid range 
+            dct = get_fx_obs(dct) # # Kudritzki relation to get 10**-7
+        if float(dct['fx']) < -1000:
+            dct = get_fx_theory(dct) # Theoretical relation to get 10**-7
+        # Use logscale fx value if that is in a valid range
         #  (only when it has set to such value in defaults, or in para-
         #  meter space, it will)
         if float(dct['logfx']) <= np.log10(16.0):
             dct['fx'] = str(round(10**(float(dct['logfx'])),7))
         # Add X-rays if the volume filling fraction > 0 *and* if teff is high
         # enough X-rays are in FW not allowed for Teff<25000 (model will crash)
-        if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):    
+        if (float(dct['fx']) > 0.0 and float(dct['teff']) >= 25000.0):
             inl.append('XRAYS ' + dct['fx'] + '\n')
             add2indat(inl, dct, ['gamx', 'mx', 'Rinx', 'uinfx', 'xpow'])
     else:
@@ -543,7 +572,7 @@ def read_linelist(theflinelist):
     return llist_names, llist_params
 
 def parallelcrop(list1, list2, list3, start_list1, stop_list1):
-    """ Based on values in list1, crop the same arguments of 
+    """ Based on values in list1, crop the same arguments of
     list2 and 3. Used for cropping spectra based on wavelength
     boundaries. If list3 equals [], only 2 lists are cropped"""
 
@@ -551,7 +580,7 @@ def parallelcrop(list1, list2, list3, start_list1, stop_list1):
     newlist2 = list2[(list1 > start_list1) & (list1 < stop_list1)]
     if list3 == []:
         return newlist1, newlist2
-    else: 
+    else:
         newlist3 = list3[(list1 > start_list1) & (list1 < stop_list1)]
         return newlist1, newlist2, newlist3
 
@@ -585,7 +614,7 @@ def rvshift(lamb0, vr):
     Output:
         - Wavelength or wavelength array with RV shift applied.
     """
-    
+
     # Constants
     c = 2.99792458*10**10 #cm/s
     angstrom = 1.0*10**-8 # multiply to go from Angstrom to cm
@@ -663,19 +692,19 @@ def execute_fastwind(atom, fwtimeout, moddir):
 
 
     pnlte_eo = './pnlte_' + atom + '.eo '
-    
-    # timeout based on cpu time 
+
+    # timeout based on cpu time
     fwtimeout = str(int(''.join(filter(str.isdigit, fwtimeout)))*60)
     timeout = 'ulimit -t ' + fwtimeout + ' ; '
-    
-    # timeout based on actual time 
+
+    # timeout based on actual time
     #timeout = 'timeout ' + fwtimeout + ' '
 
     # ----------------------------------------------------
     # This is a workaround for testing on OS X,
     # where the timeout command is not available, only
-    # gtimeout is. Can be removed when using on linux 
-    # but is in principle harmless 
+    # gtimeout is. Can be removed when using on linux
+    # but is in principle harmless
     if sys.platform == "darwin":
         timeout = 'gtimeout ' + fwtimeout + ' '
     # ----------------------------------------------------
@@ -692,7 +721,7 @@ def execute_fastwind(atom, fwtimeout, moddir):
 
     os.system(do_pnlte)
     os.system(do_pformal)
-   
+
     # Uncomment if you want to save the FW log files
     #name_pnlte = 'pnlte_' + moddir.strip('/').split('/')[-2] + '.log'
     #name_pform = 'pformal_' + moddir.strip('/').split('/')[-2] + '.log'
@@ -700,9 +729,9 @@ def execute_fastwind(atom, fwtimeout, moddir):
     #os.system('mkdir -p ../../../pformal/')
     #os.system('cp pnlte.log ../../../pnlte/' + name_pnlte)
     #os.system('cp pformal.log ../../../pformal/' + name_pform)
-        
+
     # Return to the main directory
-    # This is a weak point: if paths are changed 
+    # This is a weak point: if paths are changed
     # elsewhere then we run into errors here. #FIXME
     os.chdir('../../../../')
 
@@ -824,15 +853,15 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     """
     wave_data, flux_data, error_data = resdct[nme]
     wave_mod, flux_mod_orig = np.genfromtxt(linefile).T
-   
-    # If the wavelength range of the model is smaller than that of the 
-    # data, then add continuum at either side, so that an interpolation 
+
+    # If the wavelength range of the model is smaller than that of the
+    # data, then add continuum at either side, so that an interpolation
     # can be done around the formally calculated line (the model predicts
     # continuum, though this is 'cut off' when saving the line)
     # (cropping the data to match the model range can give problems,
     # when the amount of points that is left is less than the degrees
     # of freedom. Furthermore, when doing this, effectively you throw out
-    # part of the data when fitting). 
+    # part of the data when fitting).
 
     if min(wave_data) < min(wave_mod) or max(wave_data) > max(wave_mod):
         # Points to be added: continuum at 1.0 at both sides
@@ -840,8 +869,8 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         delta_wave = wave_mod[1] - wave_mod[0]
         addwave_left = wave_mod[0] - delta_wave
         addwave_right =  wave_mod[-1] + delta_wave
-        wave_ext1 = np.array([min(wave_mod) - 90., addwave_left])   
-        wave_ext2 = np.array([addwave_right, max(wave_mod) + 90.])   
+        wave_ext1 = np.array([min(wave_mod) - 90., addwave_left])
+        wave_ext2 = np.array([addwave_right, max(wave_mod) + 90.])
         cont_ext = np.array([1.0, 1.0])
         # Add the points to the existing arrays
         wave_mod = np.concatenate((wave_ext1, wave_mod))
@@ -861,13 +890,13 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         if nme.startswith('UV_'):
             delta_wave_data = wave_data[1] - wave_data[0]
             # Save x times higher resolution than the data
-            delta_save = delta_wave_data / 5.0  
+            delta_save = delta_wave_data / 5.0
             maxlen = (max(wave_data)-min(wave_data))/delta_save
 
         # Replace the model output by a low resolution spectrum
         save_wave = np.linspace(min(wave_data), max(wave_data), maxlen)
         flux_mod_save = interp_modflux(save_wave, wave_mod, flux_mod_orig)
-        np.savetxt(linefile, np.array([save_wave,flux_mod_save]).T, 
+        np.savetxt(linefile, np.array([save_wave,flux_mod_save]).T,
             fmt='%10.5f')
 
     # #FIXME an unconvolved low res copy could be saved here
@@ -891,7 +920,7 @@ def failed_model(linenames):
     fitness = 0.0
     fitnesses_lines = np.zeros(len(linenames))
     fitm = 999999999
-    return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot, 
+    return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot,
         linenames, fitnesses_lines)
 
 def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
@@ -958,13 +987,13 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
     return (fitm, fitness, chi2_tot, rchi2_tot, dof_tot,
         linenames, fitnesses_lines)
 
-def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad, 
+def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad,
         xlum, ionfluxinfo):
     """ Write the paramters and fitness of an individual to the
     chi2-textfile.
     """
 
-    (fitmeasure, fitness, chi2_tot, rchi2_tot, dof_tot, 
+    (fitmeasure, fitness, chi2_tot, rchi2_tot, dof_tot,
         linenames, linefitns) = fitinfo
 
     write_lines = []
@@ -982,7 +1011,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad,
         write_lines.append(hstring)
 
     gen = modname.split('_')[0]
-    fitstr = (str(chi2_tot) + ' ' + str(rchi2_tot) + ' ' +  str(dof_tot) + 
+    fitstr = (str(chi2_tot) + ' ' + str(rchi2_tot) + ' ' +  str(dof_tot) +
         ' ' + str(fitness) + ' ')
     metastr = runinfo[0] + ' ' + runinfo[1] + ' ' + runinfo[2] + ' '
     istr = modname + ' ' + gen + ' ' + fitstr + metastr
@@ -991,7 +1020,7 @@ def store_model(txtfile, genes, fitinfo, runinfo, paramnames, modname, rad,
     istr = istr + str(rad) + ' '
     istr = istr + str(xlum) + ' '
     for aflux in ionfluxinfo:
-        istr = istr + str(aflux) + ' '  
+        istr = istr + str(aflux) + ' '
     for lfit in linefitns:
         istr = istr + str(lfit) + ' '
     istr = istr + '\n'
@@ -1022,7 +1051,7 @@ def clean_run(moddir, modname, savedir, outflag):
     os.system('cp ' + moddir + 'INDAT.DAT ' + mod_outdir + 'INDAT.DAT')
     os.system('cp ' + moddir + 'broad.in ' + mod_outdir + 'broad.in')
     os.system('cp ' + moddir + 'formal.in ' + mod_outdir + 'formal.in')
-    
+
     # Compress saved dir to tar.gz file and remove the directory
     tarfilename = gendir + modname + '.tar.gz'
     os.system('tar -czf ' + tarfilename + ' -C ' + mod_outdir + ' .')
@@ -1048,17 +1077,17 @@ def grep_pnlte(moddir, search, outputfile, loc):
     return str(value)
 
 def get_runinfo(moddir):
-    """Function that looks up the number of NLTE-iterations that 
+    """Function that looks up the number of NLTE-iterations that
     fastwind has done, the maximum correction of the last iteration,
     and, if the model has finished, the total CPU time.
-    This is done by using grep on the pnlte.log file. 
+    This is done by using grep on the pnlte.log file.
     (this file will later be removed)
     """
     if os.path.exists(moddir + 'pnlte.log'):
         try:
             maxcor = grep_pnlte(moddir, "CORR. MAX:", 'corr_max', -1)
             if maxcor == '':
-                maxcor = '0.0' 
+                maxcor = '0.0'
         except:
             maxcor = '0.0'
         try:
@@ -1128,7 +1157,7 @@ def ionizing_fluxes(lam, fnu, radius):
 
     # Integrate the integrand [ph s^-1 cm^-2 Hz^-1] over frequency: Hz
     # ph s^-1 cm^-2  [number of photons per surface area per second]
-    q0 = np.trapz(integrandHI, nuHI) 
+    q0 = np.trapz(integrandHI, nuHI)
     Q0 = q0 * 4*np.pi * (radius*rsun)**2 # ph s^-1 [integrate over surface]
     logq0 = round(np.log10(q0),3)
     logQ0 = round(np.log10(Q0),3)
@@ -1144,17 +1173,17 @@ def ionizing_fluxes(lam, fnu, radius):
     return logq0, logQ0, logq1, logQ1, logq2, logQ2
 
 def read_fluxcont(moddir, mname, rstar, rmax_fw):
-    """Check if FLUXCONT is there and if so, read it to get out 
-       the ionising fluxes. 
+    """Check if FLUXCONT is there and if so, read it to get out
+       the ionising fluxes.
        Input: path to model directory and model name,
            maximum radius of FW model, stellar radius (both in rsun).
        Output: q0, Q0, q1, Q1, q2, Q2
     """
-    
+
     fluxcont = moddir + mname + '/FLUXCONT'
 
     if os.path.isfile(fluxcont):
-   
+
         # Look up the number of useful lines in the FLUXCONT
         lcount = -2
         for aline in open(fluxcont, 'r').readlines():
@@ -1167,19 +1196,19 @@ def read_fluxcont(moddir, mname, rstar, rmax_fw):
         rmax_fw = float(rmax_fw)
         stellar_surface = 4*np.pi*(rsun*rstar)**2
 
-        # Only read non empty files, FLUXCONT has typically about 
+        # Only read non empty files, FLUXCONT has typically about
         # 1700-1800 lines containing flux information
-        if lcount > 500: 
+        if lcount > 500:
             # Get FASTWIND spectrum
-            lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount, 
+            lam, logFnu = np.genfromtxt(fluxcont, max_rows=lcount,
                 skip_header=1, delimiter='').T[1:3]
             fnu = 10**logFnu # ergs/s/cm^2/Hz / RMAX^2
             fnu = fnu * rmax_fw**2 # ergs/s/A
-    
+
             q0, Q0, q1, Q1, q2, Q2 = ionizing_fluxes(lam, fnu, rstar)
-            
+
             return [q0, Q0, q1, Q1, q2, Q2]
-    
+
     return [-888, -888, -888, -888, -888, -888]
 
 
@@ -1211,7 +1240,7 @@ def evaluate_fitness(inicalcdir, rundir, savedir, all_pars, modelatom,
     xlum = get_xlum_out(moddir, mname)
     ionfluxinfo = read_fluxcont(moddir, mname, radius, rmax)
     clean_run(moddir, mname, savedir, out)
-    store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname, 
+    store_model(chi2file, genes, fitinfo, runinfo, paramnames, mname,
         radius, xlum, ionfluxinfo)
 
     return fitinfo[0], fitinfo[3]
@@ -1240,11 +1269,11 @@ def make_file_dict(indir, outdir):
     bestchi2file = 'best_chi2.txt'
     paramspacefile_out = 'parameter_space.txt'
     genvarfile_out = 'genetic_variety.txt'
-    
+
     # File names of files for run continuation
     # These are copies that contain only fully completed generations
     chi2_contfile = 'chi2_cont.txt'
-    dupl_contfile = 'dupl_cont.txt' 
+    dupl_contfile = 'dupl_cont.txt'
     generation_contfile = 'savegen_cont.txt'
     fitnesses_contfile = 'savefitness_cont.txt'
     redchi2_contfile = 'redchi2s_cont.txt'
@@ -1306,10 +1335,10 @@ def copy_input(adict, theindir):
             os.system("cp " + adict[key] + " " + theindir)
 
 def prepare_output_files(adict, cont_tf):
-    """Move the _cont files to chi2 and duplicate files if the run is 
-    continuing another run, otherwise remove the old output files, 
+    """Move the _cont files to chi2 and duplicate files if the run is
+    continuing another run, otherwise remove the old output files,
     if any are present.
-    """ 
+    """
 
     if cont_tf:
         os.system("cp " + adict["chi2_cont"] + " " + adict["chi2_out"])
@@ -1345,13 +1374,13 @@ def create_FORMAL_INPUT(inidir, line_subset, lfile, create=True):
     will be fitted. Based on the linelist we go through the
     FORMAL_INPUT "master" file and only copy those that we need to
     the FORMAL_INPUT that we will use.
-    Furthermore, the function checks whether all lines that are in 
-    the line_subset (the diagnositc lines) are present in the 
+    Furthermore, the function checks whether all lines that are in
+    the line_subset (the diagnositc lines) are present in the
     FORMAL_INPUT_master file, if not, it exits the run.
-    If the parameter 'create' is false, only a check is done, 
-    and the FORMAL input file is not really created. 
+    If the parameter 'create' is false, only a check is done,
+    and the FORMAL input file is not really created.
     """
-    
+
     # Read all line-info, this is needed for the UV_ v11 lines
     thelnames, llp = read_linelist(lfile)
     res, lbound, rbound, rv, normlx, normly, normrx, normry, lw, ang = llp
@@ -1418,7 +1447,7 @@ def create_FORMAL_INPUT(inidir, line_subset, lfile, create=True):
                 missing_lines.append(aline)
 
     if missing_lines != []:
-        print('ERROR! Some diagnostic lines are not ' + 
+        print('ERROR! Some diagnostic lines are not ' +
             'found in FORMAL_INPUT_master!')
         for missing in missing_lines:
             print(missing + ' not found')
@@ -1438,12 +1467,12 @@ def read_mut_gen(mut_gen_file):
     mutgenlines = np.genfromtxt(mut_gen_file)
     lenmut  = len(np.array(mutgenlines.shape))
 
-    # If multiple generations have been computed already, take 
-    # the last line of the file only.     
+    # If multiple generations have been computed already, take
+    # the last line of the file only.
     if lenmut == 2:
         mutgenlines = mutgenlines[-1]
-    
+
     gen = int(mutgenlines[0])
-    mutrate = mutgenlines[1]    
+    mutrate = mutgenlines[1]
 
     return gen, mutrate
