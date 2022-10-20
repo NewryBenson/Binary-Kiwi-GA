@@ -149,6 +149,40 @@ def store_genvar(txtfile, gcount, genvar, fitnesses):
         for aline in write_lines:
             the_file.write(aline)
 
+def Gamma_Edd_check(model, param_names):
+    """
+    Check whether the Eddinton limit is exceeded.
+    For this we use an approximate value for kappa. In extreme cases, this 
+    approximate kappa value (not dependent on abundances) can lead us to get 
+    gamma > 1, whereas FASTWIND wouldfind a gamma < 1 and compute the  model. 
+    Thefore, we use gamma < 1.2 as a criterion for model computation. 
+    If model computation is allowed, return True, else, return False 
+    """
+
+    # If 'teff' and 'logg' are the free parameters, compute gamma
+    if ('teff' in param_names) and ('logg' in param_names):
+        teff_idx = param_names.index('teff')
+        logg_idx = param_names.index('logg')
+        teff = model[teff_idx]
+        logg = model[logg_idx]
+    # If not, always compute the model
+    else:
+        return True
+
+    sigmaB = 5.6704e-5
+    kappa_approx = 0.34
+    speed_light = 2.99792458e10
+    gamma = kappa_approx*sigmaB*teff**4/(10**logg*speed_light)
+
+    gamma_cutoff = 1.2
+    # Compute models that are possibly meeting the FW eddington criterion
+    if gamma < gamma_cutoff:
+        return True
+    # Do not compute models that are certainly not meeting that criterion
+    else:
+        return False
+
+
 def identify_duplicate(dupfile, individual):
     """
     Look into the text file with all models to check whether a model
@@ -192,7 +226,7 @@ def rand_from_range(themin, themax, thestep, rounding):
 
     return randparam
 
-def init_pop(nindiv, params, dupfile):
+def init_pop(nindiv, params, param_names, dupfile):
     """ Generate the parameters for the initial population
 
     Input:
@@ -211,7 +245,8 @@ def init_pop(nindiv, params, dupfile):
         for pb in params:
             paramval = rand_from_range(*pb)
             params_onemod.append(paramval)
-        if not identify_duplicate(dupfile, params_onemod):
+        if (not identify_duplicate(dupfile, params_onemod) and
+            Gamma_Edd_check(params_onemod, param_names)):
             the_init_pop.append(params_onemod)
             store_models(dupfile, params_onemod)
 
@@ -406,8 +441,9 @@ def mutation_creep_string(gene_string, mutrate):
     return mutated_genestring
 
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
-    dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, mut_rate_na,
-    n_ind, na_type, br_type, dgauss, use_string, add_sigs, frac_double):
+    param_names, dupfile, gauss_w_na, gauss_w_br, gauss_b_na, gauss_b_br, 
+    mut_rate_na, n_ind, na_type, br_type, dgauss, use_string, add_sigs, 
+    frac_double):
     """Given a population of individuals and a measure for their
     fitness, generate a new generation of individuals.
 
@@ -497,7 +533,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
                 mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
-        if not dup_tf:
+        if (not dup_tf) and Gamma_Edd_check(baby_genes1, param_names):
             pop_new.append(baby_genes1)
             store_models(dupfile, baby_genes1)
 
@@ -510,7 +546,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
             dupcount = dupcount + 1
 
         dup_tf = identify_duplicate(dupfile, baby_genes2)
-        if not dup_tf:
+        if (not dup_tf) and Gamma_Edd_check(baby_genes2, param_names):
             pop_new.append(baby_genes2)
             store_models(dupfile, baby_genes2)
         else:

@@ -46,7 +46,7 @@ run_name = sys.argv[1]
 if run_name.endswith('/'):
     run_name = run_name[:-1]
 if len(sys.argv) > 2:
-    if sys.argv[2] == 'restart':
+    if sys.argv[2] == 'restart' or sys.argv[2] == '-restart':
         do_restart='yes'
     else:
         do_restart='no'
@@ -504,11 +504,21 @@ else:
         if 'fx' not in param_names and float(allp_dict['fx']) > 0:
             checkdict["Parameter space"] = False
             print("ERROR --> fx set to > 0 but not in use")
-    elif float(allp_dict['fx']) > 0.0:
+    elif 'logfx' in fixed_names:
+        print("'logfx' should not be fixed in param_space")
+        print("   if you want to fix fx, please use 'fx' for this!")
+        checkdict["Parameter space"] = False
+    elif (float(allp_dict['fx']) > 0.0) or (float(allp_dict['fx']) < -1000):
         need_xraydetails = True
         print("X-rays included")
         if float(allp_dict['fx']) > 1000:
             print("   - Estimating fx with Kudritzki 1996 law")
+            if float(allp_dict['xpow']) > -1000:
+                print("   - Kudritzki estimate cannot be used with the Puls+20")
+                print("     prescription of X-rays!")
+                checkdict["Parameter space"] = False
+        if float(allp_dict['fx']) < -1000:
+            print("   - Estimating fx with theoretical law")
             if float(allp_dict['xpow']) > -1000:
                 print("   - Kudritzki estimate cannot be used with the Puls+20")
                 print("     prescription of X-rays!")

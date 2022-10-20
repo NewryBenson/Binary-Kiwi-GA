@@ -97,7 +97,8 @@ if not args.c:
     # Pick first generation of models. The amount of individuals can
     # be more than a typical generation.
     nind_first_gen = int(cdict["f_gen1"]*cdict["nind"])
-    generation = pop.init_pop(nind_first_gen, param_space, fd["dupl_out"])
+    generation = pop.init_pop(nind_first_gen, param_space, param_names,
+            fd["dupl_out"])
     modnames = fw.gen_modnames(gencount, nind_first_gen)
     
     # Reorder input for eval_fitness function and assess fitness.
@@ -162,7 +163,7 @@ while gencount <= cdict["ngen"]:
     
     # Reproduce and asses fitness
     generation_o = pop.reproduce(generation, fitmeasures, mutation_rate,
-        cdict["clone_fraction"], param_space, fd["dupl_out"],
+        cdict["clone_fraction"], param_space, param_names, fd["dupl_out"],
         cdict["w_gauss_na"], cdict["w_gauss_br"], cdict["b_gauss_na"],
         cdict["b_gauss_br"], cdict["mut_rate_na"], cdict["nind"],
         cdict["narrow_type"], cdict["broad_type"], cdict["doublebroad"],

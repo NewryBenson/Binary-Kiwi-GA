@@ -360,7 +360,7 @@ def get_fx_theory(dct):
     msun = 1.989e33
     rsun = 6.955e10
     year = 365*24*60*60
-    mdot = 10**float(dct['mdot'])*msun/year # to g/s
+    mdot = float(dct['mdot'])*msun/year # to g/s
     vinf = float(dct['vinf'])*1e5 # to cm
     radius = float(dct['radius'])*rsun # to cm
 
@@ -523,7 +523,7 @@ def create_indat(freevals, modname, moddir, freenames, fixvals, fixnames,
         # Use the Carneiro+16 prescription
         if float(dct['fx']) > 1000:
             dct = get_fx_obs(dct) # # Kudritzki relation to get 10**-7
-        if float(dct['fx']) < -1000:
+        elif float(dct['fx']) < -1000:
             dct = get_fx_theory(dct) # Theoretical relation to get 10**-7
         # Use logscale fx value if that is in a valid range
         #  (only when it has set to such value in defaults, or in para-
