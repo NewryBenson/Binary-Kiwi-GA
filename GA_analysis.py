@@ -32,23 +32,23 @@ parser.add_argument('-fast', help='Only make fitness plot and title page',
     action='store_true', default=False)
 parser.add_argument('-open', help='After making the report, open it.',
     action='store_true', default=False)
-parser.add_argument('-param', help='Makes fitness per line plots grouped by parameter (not part of -full)',
+parser.add_argument('-param', help='Makes fitness per line plots grouped by' +
+    'parameter (not part of -full)',
     action='store_true', default=False)
-parser.add_argument('-latex', help='Makes a latex table on the title page',
-    action='store_true', default=False)
-parser.add_argument('-fitness', help='Add fitness plot with fitness (in addition to 1/chi2)',
+parser.add_argument('-fitness', help='Add fitness plot with fitness ' +
+    '(in addition to 1/chi2)',
     action='store_true', default=False)
 parser.add_argument('-radius', help='Correct radius (compute FW model)',
     action='store_true', default=False)
-parser.add_argument('-em', help='Add an extra FW model to the line profile plots. '  +
-    'Supply here the path to the spectrum, which should be an asci file  ' +
-    'containing two columns (wavelength (angstrom) and normalised flux).',
+parser.add_argument('-em', help='Add an extra FW model to the line profile'  +
+    ' plots. Supply here the path to the spectrum, which should be an asci ' +
+    'file containing two columns (wavelength (angstrom) and normalised flux).',
     default='')
 parser.add_argument('-efm', help='Add an extra FW model to the line  ' +
-    'profile plots. Supply here the path to the directory. The directory should ' +
-    'contain (broadened) line profiles with names as in the GA run + ending ' +
-    'on .prof, e.g. "HALPHA.prof". The files schould be asci format and have ' +
-    'two columns: wavelength (angstrom) and normalised flux. ',
+    'profile plots. Supply here the path to the directory. The directory ' +
+    'should contain (broadened) line profiles with names as in the GA run ' +
+    '+ ending on .prof, e.g. "HALPHA.prof". The files schould be asci ' +
+    'format and have two columns: wavelength (angstrom) and normalised flux. ',
     default='')
 args = parser.parse_args()
 
@@ -144,8 +144,8 @@ dof_tot = npspec - nfree
 nind = int(np.genfromtxt(thecontrolfile, dtype='str')[0,1])
 
 # Do radius correction. This is always done if a FW model is present
-df, best_indat = fga.radius_correction(df, fastwind_local, runname, thecontrolfile,
-    theradiusfile, datapath, outpath, comp_fw=args.radius)
+df, best_indat = fga.radius_correction(df, fastwind_local, runname,
+    thecontrolfile, theradiusfile, datapath, outpath, comp_fw=args.radius)
 
 #  Compute derived parameters
 df, deriv_pars = fga.more_parameters(df, param_names, fix_names, fix_vals)
@@ -169,14 +169,9 @@ best_model_name, bestfamily_name, params_error_1sig, \
 
 with PdfPages(pdfname) as the_pdf:
     #  Create a title page with best fit parameters
-    if not args.latex:
-        the_pdf = fga.titlepage(df, runname, params_error_1sig, params_error_2sig,
-            the_pdf, param_names, maxgen, nind, linedct, 2,
-            deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
-    else:
-        the_pdf = fga.titlepage_latex(df, runname, params_error_1sig, params_error_2sig,
-                                      the_pdf, param_names, maxgen, nind, linedct, 2,
-                                      deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
+    the_pdf = fga.titlepage(df, runname, params_error_1sig, params_error_2sig,
+        the_pdf, param_names, maxgen, nind, linedct, 2,
+        deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
 
     # Create overview fitness plot (1/rchi2)
     the_pdf = fga.fitnessplot(df, 'invrchi2', params_error_1sig,
@@ -236,8 +231,8 @@ with PdfPages(pdfname) as the_pdf:
 
     if args.param or args.full:
         for i, param in enumerate(param_names):
-            the_pdf = fga.fitnessplot_per_parameter(df, param, params_error_1sig, params_error_2sig, the_pdf, linenames,
-                                                    param_space[i], maxgen)
+            the_pdf = fga.fitnessplot_per_parameter(df, param, params_error_1sig,
+                params_error_2sig, the_pdf, linenames, param_space[i], maxgen)
 
 fga.save_bestvals(param_names, deriv_pars, params_error_1sig, params_error_2sig,
     deriv_params_error_1sig, deriv_params_error_2sig, savebestfile)
