@@ -149,14 +149,13 @@ def store_genvar(txtfile, gcount, genvar, fitnesses):
         for aline in write_lines:
             the_file.write(aline)
 
-def Gamma_Edd_check(model, param_names, fixed_names, fixed_pars):
+def Gamma_Edd_check(model, param_names):
     """
     Check whether the Eddinton limit is exceeded.
-    We do not compute mu (mean atomic mass) in detail, but assume a
-    conservative value (giving the highest Gamma_Edd) of 1.2
-    Apart from that we do the computation as in FW. To be on the safe side
-    (i.e. not to throw away models that would possibly be ok for FW),
-    we use a cutoff value of Gamma_Edd of 1.05.
+    We do not compute mR (mean atomic mass) in detail, but assume a
+    conservative value (giving the lowest Gamma_Edd) of 2.2
+    For Helium we use standard a low value, as FW computes GAMMA 
+    not based on the input HE but based on the starting model HE
     If model computation is allowed, return True, else, return False
     """
 
@@ -164,36 +163,31 @@ def Gamma_Edd_check(model, param_names, fixed_names, fixed_pars):
     if ('teff' in param_names) and ('logg' in param_names):
         teff_idx = param_names.index('teff')
         logg_idx = param_names.index('logg')
-        teff = model[teff_idx]
-        logg = model[logg_idx]
-        if ('yhe' in param_names):
-            yhe_idx = param_names.index('yhe')
-            yhe = model[yhe_idx]
-        elif ('yhe' in fixed_names):
-            yhe_idx = fixed_names.index('yhe')
-            yhe = fixed_pars[yhe_idx]
-        else:
-            yhe = 0.5 # Conservative
-    # If not, always compute the model
+        teff = float(model[teff_idx])
+        logg = float(model[logg_idx])
+        yhe = 0.08
+
+    # If not, compute the model
     else:
         return True
 
     sigmaB = 5.6704e-5
-    speed_light = 2.99792458e10
-    sigmae = 0.3977246
+    speed_light = 2.997925e10
+    amh = 1.67352e-24
+    sigmae = 6.65e-25/amh
     ggrav = 10**(logg)
 
-    ihe_start = 2.0 # Higest value possible in fastwind (conservative)
-    mu = 1.2 # Mean atomic mass. Use lowest value possible (conservative)
+    ihe_start = 1.0 # Lowest value for OB stars (O stars = 2, B stars = 1)
+    mu = 2.2 # Mean atomic mass. Use a rather high value to be safe
 
     c2 = (1.0 + ihe_start*yhe)/mu
     sigem = sigmae * c2
 
     gamma = sigem * (sigmaB/speed_light) * teff**4 /ggrav
 
-    print('Test Gam_Edd: gamma = ', gamma, 'teff =', teff, 'logg = ', logg, 'yhe =', yhe)
+    print('gamma = ', gamma, 'teff =', teff, 'logg = ', logg, 'yhe =', yhe)
 
-    gamma_cutoff = 1.05
+    gamma_cutoff = 1.00
     # Compute models that are possibly meeting the FW eddington criterion
     if gamma < gamma_cutoff:
         return True
@@ -245,7 +239,7 @@ def rand_from_range(themin, themax, thestep, rounding):
 
     return randparam
 
-def init_pop(nindiv, params, param_names, fixed_names, fixed_pars, dupfile):
+def init_pop(nindiv, params, param_names, dupfile):
     """ Generate the parameters for the initial population
 
     Input:
@@ -264,12 +258,11 @@ def init_pop(nindiv, params, param_names, fixed_names, fixed_pars, dupfile):
         for pb in params:
             paramval = rand_from_range(*pb)
             params_onemod.append(paramval)
-        if (not identify_duplicate(dupfile, params_onemod) and
-            Gamma_Edd_check(params_onemod, param_names,
-                fixed_names, fixed_pars)):
+        if ((not identify_duplicate(dupfile, params_onemod)) and
+            Gamma_Edd_check(params_onemod, param_names)):
             the_init_pop.append(params_onemod)
             store_models(dupfile, params_onemod)
-
+        
     return np.array(the_init_pop)
 
 def crossover(mother_genes, father_genes, clone_fraction):
@@ -461,7 +454,7 @@ def mutation_creep_string(gene_string, mutrate):
     return mutated_genestring
 
 def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
-    param_names, fixed_names, fixed_pars, dupfile, gauss_w_na, gauss_w_br,
+    param_names, dupfile, gauss_w_na, gauss_w_br,
     gauss_b_na, gauss_b_br, mut_rate_na, n_ind, na_type, br_type, dgauss,
     use_string, add_sigs, frac_double):
     """Given a population of individuals and a measure for their
@@ -553,8 +546,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
                 mutation_rate, gauss_w_br, gauss_b_br, br_type, double_yn=dgauss)
 
         dup_tf = identify_duplicate(dupfile, baby_genes1)
-        if (not dup_tf) and Gamma_Edd_check(baby_genes1, param_names,
-            fixed_names, fixed_pars):
+        if (not dup_tf) and Gamma_Edd_check(baby_genes1, param_names):
             pop_new.append(baby_genes1)
             store_models(dupfile, baby_genes1)
 
@@ -567,8 +559,7 @@ def reproduce(pop_orig, fitm, mutation_rate, clone_fraction, paramspace,
             dupcount = dupcount + 1
 
         dup_tf = identify_duplicate(dupfile, baby_genes2)
-        if (not dup_tf) and Gamma_Edd_check(baby_genes2, param_names,
-            fixed_names, fixed_pars):
+        if (not dup_tf) and Gamma_Edd_check(baby_genes2, param_names):
             pop_new.append(baby_genes2)
             store_models(dupfile, baby_genes2)
         else:
