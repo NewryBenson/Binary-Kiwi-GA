@@ -83,6 +83,9 @@ def magnitude_to_radius(teff, band, obsmag, zp_system, Tfrac=0.9,
     elif band == '2MASS_Ks':
         filterfile = '2MASS_Ks.dat'
         waveunit = 'angstrom'
+    elif band == 'VISTA_Ks':
+        filterfile = 'Paranal_VISTA.Ks.dat'
+        waveunit = 'angstrom'    
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'
         waveunit = 'angstrom'
@@ -223,6 +226,12 @@ def magnitude_to_radius_SED(sed_wave, sed_flam, band, obsmag, zp_system,
         waveunit = 'nm'
     elif band == 'HST_555w':
         filterfile = 'HST_ACS_HRC.F555W.dat'
+        waveunit = 'angstrom'
+    elif band == '2MASS_Ks':
+        filterfile = '2MASS_Ks.dat'
+        waveunit = 'angstrom'
+    elif band == 'VISTA_Ks':
+        filterfile = 'Paranal_VISTA.Ks.dat'
         waveunit = 'angstrom'
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'

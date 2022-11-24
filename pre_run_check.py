@@ -28,7 +28,9 @@ import fastwind_wrapper as fw
 import population as pop
 
 jobscriptfile = 'run_kiwiGA.job' # name of job script file 
-hours_str = '72' # maximum wall time 
+hours_str = '120' # maximum wall time -- but see below!
+walltime_flex = True # adjust maximum wall time depending on ngen
+hrs_gen = 1.1 # hours per generation if walltime_flex
 n_cpu_core = 128.0 # number of CPUs per node
 username = 'sbrands'
 codedir = 'Kiwi-GA'
@@ -139,6 +141,9 @@ if (ctrldct["nind"]+1)/n_cpu_core % 1.0  > 0.0:
 
 print("\nnind = " + str(ctrldct["nind"]))
 print("ngen = " + str(ctrldct["ngen"]))
+
+if walltime_flex:
+    hours_str = str(int(math.ceil(float(ctrldct["ngen"])*hrs_gen)))
 
 printsection("FW version")
 # Check version 10 vs 11
