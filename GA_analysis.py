@@ -170,7 +170,7 @@ best_model_name, bestfamily_name, params_error_1sig, \
 with PdfPages(pdfname) as the_pdf:
     #  Create a title page with best fit parameters
     the_pdf = fga.titlepage(df, runname, params_error_1sig, params_error_2sig,
-        the_pdf, param_names, maxgen, nind, linedct, 2,
+        the_pdf, param_names, maxgen, nind, linedct, 1,
         deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
 
     # Create overview fitness plot (1/rchi2)

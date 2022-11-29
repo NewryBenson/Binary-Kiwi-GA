@@ -182,6 +182,9 @@ def magnitude_to_radius_SED(sed_wave, sed_flam, band, obsmag, zp_system,
     elif band == '2MASS_Ks':
         filterfile = '2MASS_Ks.dat'
         waveunit = 'angstrom'
+    elif band == 'VISTA_Ks':
+        filterfile = 'Paranal_VISTA.Ks.dat'
+        waveunit = 'angstrom'
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'
         waveunit = 'angstrom'
@@ -313,6 +316,15 @@ def more_parameters(df, param_names, fix_names, fix_vals):
     if 'windturb' in df.columns and 'vinf' in df.columns:
         df['windturb_kms'] = df['windturb'] * df['vinf']
         plist.append('windturb_kms')
+    if 'mdot' in df.columns and 'fclump' in df.columns:
+        df['mdot_fclump'] = np.log10(10**df['mdot'] * np.sqrt(df['fclump']))
+        plist.append('mdot_fclump')
+    elif 'mdot' in df.columns:
+        df['mdot_fclump'] = np.log10(10**df['mdot'] * np.sqrt(fix_dict['fclump']))
+        plist.append('mdot_fclump')
+    elif 'fclump' in df.columns:
+        df['mdot_fclump'] = np.log10(10**fix_dict['mdot'] * np.sqrt(df['fclump']))
+        plist.append('mdot_fclump')
 
     return df, plist
 
@@ -367,6 +379,32 @@ def calculateP_noncent(chi2, degreesFreedom, lambda_nc):
             probs[i] = stats.ncx2.sf(chi2[i], degreesFreedom, lambda_nc)
     return probs
 
+def update_magnitude(m_name_orig, m_value_orig, m_system_orig,
+    the_runname):
+    ''' Look up runname to check if a different magniude should be adopted'''
+
+    fname_muptdate = "lum_anchor_update.dat"
+    if os.path.isfile(fname_muptdate):
+        updatefile = open(fname_muptdate, 'r')
+        allines_mupdate = updatefile.readlines()
+        for magline in allines_mupdate[1:]:
+            maglinelist = magline.strip().split()
+            if len(maglinelist) == 4:
+                runname0 = maglinelist[0]
+                if runname0 == the_runname:
+                    m_name_new = maglinelist[1]
+                    m_value_new = float(maglinelist[2])
+                    m_system_new = maglinelist[3]
+                    print('Adopting new luminosity anchor')
+                    return m_name_new, m_value_new, m_system_new
+            else:
+                errstr = "ERROR IN " + fname_muptdate + '!'
+                errstr = errstr + '\n press enter to use UNCHANGED values.'
+                input(errstr)
+    else:
+        return m_name_orig, m_value_orig, m_system_orig
+
+
 def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
     datapath, outpath, comp_fw):
 
@@ -376,6 +414,7 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
 
     xbest = pd.Series.idxmin(df['rchi2'])
     best_model_name = df['run_id'][xbest]
+    print('Best model:', best_model_name)
     best_gen_name = best_model_name.split('_')[0]
     bestmod_fw = fw_path + runname + '_' + best_model_name + '/'
     savemoddir = datapath + 'saved/' + best_gen_name + '/'
@@ -432,18 +471,26 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
         mod_rstar = float(open(fwindat, 'r').readlines()[3].strip().split()[-1])
         stellar_surface = 4*np.pi*(rsun*mod_rstar)**2
 
-        magnitude_name = np.genfromtxt(theradiusfile, dtype='str')[0]
-        magnitude_value = np.genfromtxt(theradiusfile)[1]
-        magnitude_system = np.genfromtxt(theradiusfile, dtype='str')[2]
+        m_name = np.genfromtxt(theradiusfile, dtype='str')[0]
+        m_value = np.genfromtxt(theradiusfile)[1]
+        m_system = np.genfromtxt(theradiusfile, dtype='str')[2]
+
+        m_name, m_value, m_system = update_magnitude(m_name, m_value, m_system,
+            runname)
 
         new_rad = magnitude_to_radius_SED(lam, flam/stellar_surface,
-            magnitude_name, magnitude_value, magnitude_system,
+            m_name, m_value, m_system,
             filterdir='filter_transmissions/')
 
         radius_ratio = new_rad/mod_rstar
 
+        df['Q_radius_old'] = (10**df['mdot'])/(df['radius'])**(3/2)
+
         # Correct all radii with the perc. correction from the best fit model.
         df['radius'] = df['radius']*radius_ratio
+
+        # Correct mass loss rates by assuming a fixed Q value (Puls+96)
+        df['mdot'] = np.log10(df['Q_radius_old']*(df['radius'])**(3/2))
 
         df['q0'] = 10**df['logq0']
         df['logQ0'] = np.log10(df['q0']*4*np.pi*(rsun*df['radius'])**2)
@@ -813,6 +860,11 @@ def fitnessplot_per_parameter(df, xval, params_error_1sig, params_error_2sig,
         if xval != line_names[i]:
             scat0 = ax[crow,ccol].scatter(df[xval], df[line_names[i]],
                 c=df['gen'], cmap=cmap, norm=norm, s=10)
+            df_tmp_best = df.copy().sort_values(by=[line_names[i]],
+                ascending=False)
+            thebestval = df_tmp_best[xval].iloc[0]
+            ax[crow,ccol].text(0.95, 0.95,thebestval,
+                ha='right', va='top', transform=ax[crow,ccol].transAxes)
         else:
             hist_data = [df[xval][df['gen'] == i] for i in range(maxgen)]
             ax[crow,ccol].hist(hist_data, bins=np.arange(param_space[0],
