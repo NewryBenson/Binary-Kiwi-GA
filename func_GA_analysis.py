@@ -487,13 +487,13 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
 
         radius_ratio = new_rad/mod_rstar
 
-        df['Q_radius_old'] = (10**df['mdot'])/(df['radius'])**(3/2)
+        df['Q_radius_old'] = (10**df['mdot'])/(df['radius'])**(3./2.)
 
         # Correct all radii with the perc. correction from the best fit model.
         df['radius'] = df['radius']*radius_ratio
 
         # Correct mass loss rates by assuming a fixed Q value (Puls+96)
-        df['mdot'] = np.log10(df['Q_radius_old']*(df['radius'])**(3/2))
+        df['mdot'] = np.log10(df['Q_radius_old']*(df['radius'])**(3./2.))
 
         df['q0'] = 10**df['logq0']
         df['logQ0'] = np.log10(df['q0']*4*np.pi*(rsun*df['radius'])**2)
