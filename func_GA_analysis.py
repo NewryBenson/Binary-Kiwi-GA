@@ -385,6 +385,9 @@ def update_magnitude(m_name_orig, m_value_orig, m_system_orig,
 
     fname_muptdate = "lum_anchor_update.dat"
     if os.path.isfile(fname_muptdate):
+        the_rnames = np.genfromtxt(fname_muptdate, dtype='str').T[0]
+        if not the_runname in the_rnames:
+            return m_name_orig, m_value_orig, m_system_orig
         updatefile = open(fname_muptdate, 'r')
         allines_mupdate = updatefile.readlines()
         for magline in allines_mupdate[1:]:
