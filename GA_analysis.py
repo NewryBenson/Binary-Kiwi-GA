@@ -1,6 +1,5 @@
 # Script for visualising the run output of Kiwi-GA
 # Created by Sarah Brands @ 29 July 2022
-# Edited by Frank Backs & Sarah Brands
 
 import os
 import sys
@@ -38,8 +37,14 @@ parser.add_argument('-param', help='Makes fitness per line plots grouped by' +
 parser.add_argument('-fitness', help='Add fitness plot with fitness ' +
     '(in addition to 1/chi2)',
     action='store_true', default=False)
+parser.add_argument('-latex', help='Makes a latex table on the title page',
+    action='store_true', default=False)
 parser.add_argument('-radius', help='Correct radius (compute FW model)',
     action='store_true', default=False)
+parser.add_argument('-maxgen', type=int, help="If 1 number is specified, " +
+    "the last generation to consider. If 2 numbers are supplied the first " +
+    "and last generation to consider",
+    default=[], nargs="*")
 parser.add_argument('-em', help='Add an extra FW model to the line profile'  +
     ' plots. Supply here the path to the spectrum, which should be an asci ' +
     'file containing two columns (wavelength (angstrom) and normalised flux).',
@@ -115,7 +120,20 @@ df = pd.DataFrame(chi2data, columns=colnames)
 runids = np.genfromtxt(thechi2file, dtype='str').T[0]
 df['run_id'] = runids
 df['gen'] = df['gen'].astype(int)
-maxgen = np.max(df['gen']) + 1
+if len(args.maxgen) == 0:
+    maxgen = np.max(df['gen']) + 1
+elif len(args.maxgen) == 1:
+    maxgen = args.maxgen[0]
+    df = df[df["gen"] <= args.maxgen[0]]
+    pdfname = pdfname[:-4] + "_gen_%i.pdf" % args.maxgen[0]
+elif len(args.maxgen) == 2:
+    df = df[(df["gen"] >= args.maxgen[0]) * (df["gen"] <= args.maxgen[1])]
+    pdfname = pdfname[:-4] + "_gen_%i-%i.pdf" % (args.maxgen[0], args.maxgen[1])
+    maxgen = args.maxgen[1]
+else:
+    print("Too many arguments for -maxgen!")
+    exit()
+
 df_orig = df.copy()
 
 # Read spectrum
@@ -158,6 +176,12 @@ df, deriv_pars = fga.more_parameters(df, param_names, fix_names, fix_vals)
 df, best_uncertainty = fga.get_uncertainties(df, dof_tot, npspec,
     param_names, param_space, deriv_pars, incl_deriv=True)
 
+# Add additional radius uncertainties
+best_uncertainty = fga.add_anchor_magnitude_uncertainty(df, runname,
+                                                        best_uncertainty,
+                                                        fastwind_local,
+                                                        theradiusfile)
+
 # Unpack all computed values
 best_model_name, bestfamily_name, params_error_1sig, \
     params_error_2sig, deriv_params_error_1sig, deriv_params_error_2sig, \
@@ -169,9 +193,14 @@ best_model_name, bestfamily_name, params_error_1sig, \
 
 with PdfPages(pdfname) as the_pdf:
     #  Create a title page with best fit parameters
-    the_pdf = fga.titlepage(df, runname, params_error_1sig, params_error_2sig,
-        the_pdf, param_names, maxgen, nind, linedct, 1,
-        deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
+    if args.latex:
+        the_pdf = fga.titlepage_latex(df, runname, params_error_1sig,
+            params_error_2sig, the_pdf, param_names, maxgen, nind, linedct, 1,
+            deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
+    else:
+        the_pdf = fga.titlepage(df, runname, params_error_1sig,
+            params_error_2sig, the_pdf, param_names, maxgen, nind, linedct, 1,
+            deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars)
 
     # Create overview fitness plot (1/rchi2)
     the_pdf = fga.fitnessplot(df, 'invrchi2', params_error_1sig,

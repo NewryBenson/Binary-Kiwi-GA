@@ -14,6 +14,8 @@ import matplotlib.image as mpimg
 import fastwind_wrapper as fw
 import magnitude_to_radius as m2r
 
+RMSEA_THRESHOLD = 1.5
+
 def get_luminosity(Teff, radius):
     '''Calculate L in terms of log(L/Lsun), given Teff (K)
     and the radius in solar radii'''
@@ -187,6 +189,9 @@ def magnitude_to_radius_SED(sed_wave, sed_flam, band, obsmag, zp_system,
         waveunit = 'angstrom'
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'
+        waveunit = 'angstrom'
+    elif band == "Johnson_J":
+        filterfile = "Generic_Johnson.J.dat"
         waveunit = 'angstrom'
     else:
         print('Unknown value for <band>, exiting')
@@ -385,7 +390,7 @@ def update_magnitude(m_name_orig, m_value_orig, m_system_orig,
 
     fname_muptdate = "lum_anchor_update.dat"
     if os.path.isfile(fname_muptdate):
-        the_rnames = np.genfromtxt(fname_muptdate, dtype='str').T[0]
+        the_rnames = np.genfromtxt(fname_muptdate, dtype='str', usecols=[0]).T
         if not the_runname in the_rnames:
             return m_name_orig, m_value_orig, m_system_orig
         updatefile = open(fname_muptdate, 'r')
@@ -400,6 +405,17 @@ def update_magnitude(m_name_orig, m_value_orig, m_system_orig,
                     m_system_new = maglinelist[3]
                     print('Adopting new luminosity anchor')
                     return m_name_new, m_value_new, m_system_new
+            # Extra option to include an uncertainty on the magnitude
+            elif len(maglinelist) == 5:
+                runname0 = maglinelist[0]
+                if runname0 == the_runname:
+                    m_name_new = maglinelist[1]
+                    m_value_new = float(maglinelist[2])
+                    m_value_error = float(maglinelist[3])
+                    m_system_new = maglinelist[4]
+                    print('Adopting new luminosity anchor with uncertainty')
+                    return m_name_new, m_value_new,\
+                           m_system_new, m_value_error
             else:
                 errstr = "ERROR IN " + fname_muptdate + '!'
                 errstr = errstr + '\n press enter to use UNCHANGED values.'
@@ -479,7 +495,7 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
         m_system = np.genfromtxt(theradiusfile, dtype='str')[2]
 
         m_name, m_value, m_system = update_magnitude(m_name, m_value, m_system,
-            runname)
+            runname)[:3]
 
         new_rad = magnitude_to_radius_SED(lam, flam/stellar_surface,
             m_name, m_value, m_system,
@@ -514,7 +530,7 @@ def radius_correction(df, fw_path, runname, thecontrolfile, theradiusfile,
 def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
     deriv_pars, incl_deriv=True):
 
-    if np.min(df['rchi2']) > 1.0:
+    if np.min(df['rchi2']) > RMSEA_THRESHOLD:
         which_statistic = 'RMSEA' # 'Pval_chi2' or 'Pval_ncchi2' or 'RMSEA'
     else:
         which_statistic = 'Pval_chi2'
@@ -582,6 +598,137 @@ def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
 
     return df,best_uncertainty
 
+
+def propagate_uncertainty(value_dict, param_name, radius, delta_radius, power,
+                          log=False):
+    """
+    Propagates the uncertainty on the radius to other parameters.
+    Assumes the additional error term is normally distributed and small enough
+    to be considered symmetric in powerlaws.
+    value_dict assumes for each key the shape (lower_limit, upper_limit, best)
+    param_name indicates the parameter to propagate error to.
+    radius and delta_radius are the radius and extra uncertainty on it. Note
+    that the delta_radius has to correspond to the desired nsigma.
+    power is the power dependence on the radius for the parameter.
+    """
+    if log:
+        best = 10**value_dict[param_name][2]
+        low = best - 10**value_dict[param_name][0]
+        up = 10**value_dict[param_name][1] - best
+    else:
+        best = value_dict[param_name][2]
+        low = best - value_dict[param_name][0]
+        up = best - value_dict[param_name][1]
+
+    # The additional uncertainty term:
+    extra_err = best * (delta_radius / radius) * power
+
+    new_low = (extra_err**2 + low**2)**0.5
+    new_up = (extra_err**2 + up**2)**0.5
+
+    if log:
+        value_dict[param_name][0] = np.log10(best - new_low)
+        value_dict[param_name][1] = np.log10(best + new_up)
+    else:
+        value_dict[param_name][0] = best - new_low
+        value_dict[param_name][1] = best + new_up
+
+    return value_dict
+
+
+def add_anchor_magnitude_uncertainty(df, runname, best_uncertainty,
+                                     fw_path, theradiusfile):
+    """
+    Adds the uncertainty from the error in the absolute magnitude. The error is
+    taken from the lum_anchor_update file. Performs error propagation to all
+    relevant parameters.
+    """
+    # Get the original magnitude first
+    m_name = np.genfromtxt(theradiusfile, dtype='str')[0]
+    m_value = np.genfromtxt(theradiusfile)[1]
+    m_system = np.genfromtxt(theradiusfile, dtype='str')[2]
+    # try to update
+    new_mag = update_magnitude(m_name, m_value, m_system, runname)
+    if len(new_mag) == 4:
+        m_name, m_value, m_system, m_error = new_mag
+    else:
+        print("Not adding anchor magnitude uncertainties!")
+        return best_uncertainty
+
+    # Check if a SED has been calculated for this run. Use that if available.
+    # Otherwise use the default approximation for the radius.
+    xbest = pd.Series.idxmin(df['rchi2'])
+    best_model_name = df['run_id'][xbest]
+    bestmod_fw = fw_path + runname + '_' + best_model_name + '/'
+    if os.path.isfile(bestmod_fw + 'FLUXCONT'):
+        lam, flam = get_fw_fluxcont(bestmod_fw)
+        fwindat = fw_path + 'INDAT.DAT'
+
+        rsun = 6.96e10 # cm
+        mod_rstar = float(open(fwindat, 'r').readlines()[3].strip().split()[-1])
+        stellar_surface = 4*np.pi*(rsun*mod_rstar)**2
+
+        new_rad = magnitude_to_radius_SED(lam, flam/stellar_surface,
+            m_name, m_value, m_system)
+        max_rad1 = magnitude_to_radius_SED(lam, flam/stellar_surface,
+            m_name, m_value - m_error, m_system)
+        max_rad2 = magnitude_to_radius_SED(lam, flam/stellar_surface,
+            m_name, m_value - 2 * m_error, m_system)
+        min_rad1 = magnitude_to_radius_SED(lam, flam/stellar_surface,
+            m_name, m_value + m_error, m_system)
+        min_rad2 = magnitude_to_radius_SED(lam, flam/stellar_surface,
+            m_name, m_value + 2 * m_error, m_system)
+
+    else:
+        print("No SED for radius correction found, using approximation")
+        new_rad = m2r.magnitude_to_radius(df['teff'][xbest],
+                                          m_name, m_value, m_system)
+        max_rad1 = m2r.magnitude_to_radius(df['teff'][xbest],
+                                          m_name, m_value - m_error, m_system)
+        max_rad2 = m2r.magnitude_to_radius(df['teff'][xbest],
+                                          m_name, m_value - 2*m_error, m_system)
+        min_rad1 = m2r.magnitude_to_radius(df['teff'][xbest],
+                                          m_name, m_value + m_error, m_system)
+        min_rad2 = m2r.magnitude_to_radius(df['teff'][xbest],
+                                          m_name, m_value + 2*m_error, m_system)
+
+    delta_radius1 = (max_rad1 - min_rad1) * 0.5
+    delta_radius2 = (max_rad2 - min_rad2) * 0.5
+
+    # Unpack uncertainties
+    best_model_name, bestfamily_name, pars_err1, pars_err2, d_pars_err1,\
+        d_pars_err2, which_statistic = best_uncertainty
+
+    # All the parameters that need to have their uncertainty updated based on
+    # the changed radius uncertainty. The number are the power of the dependence
+    # on the radius. The bool indicates if the parameter is used in log
+    all_derived_parameters = (("radius", 1.0, False),
+                              ("logL", 2.0, True),
+                              ("logQ0", 2.0, True),
+                              ("logQ1", 2.0, True),
+                              ("logQ2", 2.0, True),
+                              ("Mspec", 2.0, False),
+                              ("vesc_eff", 0.5, False),
+                              ("vinf_vesc", 0.5, False),
+                              ("mdot_fclump", 1.5, True))
+
+    for dpar, power, log in all_derived_parameters:
+        if dpar in d_pars_err1:
+            d_pars_err1 = propagate_uncertainty(d_pars_err1, dpar, new_rad,
+                                                delta_radius1, power, log=log)
+            d_pars_err2 = propagate_uncertainty(d_pars_err2, dpar, new_rad,
+                                                delta_radius2, power, log=log)
+
+    # mdot is done separately, because it is not a derived parameter.
+    if "mdot" in pars_err1:
+        pars_err1 = propagate_uncertainty(pars_err1, "mdot", new_rad,
+                                          delta_radius1, 1.5, log=True)
+        pars_err2 = propagate_uncertainty(pars_err2, "mdot", new_rad,
+                                          delta_radius2, 1.5, log=True)
+
+    # returns the same best_uncertainty tuple, but with updated values
+    return best_model_name, bestfamily_name, pars_err1, pars_err2, d_pars_err1,\
+        d_pars_err2, which_statistic
 
 def titlepage(df, runname, params_error_1sig, params_error_2sig,
     the_pdf, param_names, maxgen, nind, linedct, which_sigma,
@@ -683,6 +830,111 @@ def titlepage(df, runname, params_error_1sig, params_error_2sig,
 
     return the_pdf
 
+
+def titlepage_latex(df, runname, params_error_1sig, params_error_2sig,
+    the_pdf, param_names, maxgen, nind, linedct, which_sigma,
+    deriv_params_error_1sig, deriv_params_error_2sig, deriv_pars):
+    """
+    Make a page with best fit parameters and errors
+    """
+    plt.rcParams['text.usetex'] = True
+
+    ncrash = len(df.copy()[df['chi2'] == 999999999])
+    ntot = len(df)
+    perccrash = round(100.0*ncrash/ntot,1)
+    minrchi2 = round(np.min(df['rchi2']),2)
+    nlines = len(linedct['name'])
+
+    fig, ax = plt.subplots(2,2,figsize=(12.5, 12.5),
+        gridspec_kw={'height_ratios': [0.5, 3], 'width_ratios': [2, 8]})
+
+    # Not catch all, but catch most solution
+    path_to_ga = sys.argv[0].strip("GA_analysis.py")
+    if os.path.isfile(path_to_ga + 'kiwi.jpg'):
+        ax[0,0].imshow(mpimg.imread(path_to_ga + 'kiwi.jpg'))
+
+    ax[0,0].axis('off')
+    ax[0,1].axis('off')
+    ax[1,0].axis('off')
+    ax[1,1].axis('off')
+
+    boldtext = {'ha':'left', 'va':'top', 'weight':'bold'}
+    normtext = {'ha':'left', 'va':'top'}
+    offs = 0.12
+    yvalmax = 0.9
+    ax[0,1].text(0.0, yvalmax, r'{\bf Run name}', **boldtext)
+    ax[0,1].text(0.25, yvalmax, runname, **normtext)
+    ax[0,1].text(0.0, yvalmax-1*offs, r'{\bf Best rchi2}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-1*offs, str(minrchi2), **normtext)
+    ax[0,1].text(0.0, yvalmax-2*offs, r'{\bf Generations}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-2*offs, str(maxgen), **normtext)
+    ax[0,1].text(0.0, yvalmax-3*offs, r'{\bf Individuals per gen}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-3*offs, str(nind), **normtext)
+    ax[0,1].text(0.0, yvalmax-4*offs,r'{\bf Total number of models}',**boldtext)
+    ax[0,1].text(0.25, yvalmax-4*offs, str(ntot), **normtext)
+    ax[0,1].text(0.0, yvalmax-5*offs, r'{\bf Crashed models}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-5*offs, str(perccrash) + '\%', **normtext)
+    ax[0,1].text(0.0, yvalmax-6*offs, r'{\bf Number of lines}', **boldtext)
+    ax[0,1].text(0.25, yvalmax-6*offs, str(nlines), **normtext)
+
+    if which_sigma == 2:
+        psig = params_error_2sig
+        deriv_psig = deriv_params_error_2sig
+    else:
+        psig = params_error_1sig
+        deriv_psig = deriv_params_error_1sig
+
+    table_text = r"\begin{tabular}{l|r|rr} "
+    table_text += r"{\bf Parameter} & {\bf Value} & {\bf min %i$\sigma$} &" \
+        r" {\bf max %i$\sigma$} \rule{0pt}{2.6ex} \\ \hline " % (which_sigma,
+                                                                 which_sigma)
+    for paramname in param_names:
+        table_text += r"%s & $%s_{-%s}^{+%s}$ & $%s$ & $%s$ \rule{0pt}{2.6ex}" \
+                      r" \\ " % (
+            paramname,
+            np.format_float_positional(psig[paramname][2],
+                                       trim="-", precision=2),
+            np.format_float_positional(psig[paramname][2] - psig[paramname][0],
+                                       trim="-", precision=2),
+            np.format_float_positional(psig[paramname][1] - psig[paramname][2],
+                                       trim="-", precision=2),
+            np.format_float_positional(psig[paramname][0],
+                                       trim="-", precision=2),
+            np.format_float_positional(psig[paramname][1],
+                                       trim="-", precision=2))
+    table_text += r"\hline "
+    for paramname in deriv_pars:
+        table_text += r"%s & $%s_{-%s}^{+%s}$ & $%s$ & $%s$ \rule{0pt}{2.6ex}" \
+                      r" \\ " % (
+fix_latex(paramname),
+np.format_float_positional(deriv_psig[paramname][2], trim="-", precision=2),
+np.format_float_positional(deriv_psig[paramname][2] - deriv_psig[paramname][0],
+                           trim="-", precision=2),
+np.format_float_positional(deriv_psig[paramname][1] - deriv_psig[paramname][2],
+                           trim="-", precision=2),
+np.format_float_positional(deriv_psig[paramname][0], trim="-", precision=2),
+np.format_float_positional(deriv_psig[paramname][1], trim="-", precision=2))
+
+    table_text += r"\end{tabular}"
+    ax[1,1].text(0, 0.5, table_text, ha="left", va="center")
+
+    plt.tight_layout()
+    the_pdf.savefig(dpi=150)
+    plt.close()
+
+    # Stop using latex rendering to not mess with any other plots
+    plt.rcParams['text.usetex'] = False
+    return the_pdf
+
+
+def fix_latex(string):
+    """
+    removes underscores
+    """
+    string = string.replace("_", " ")
+    return string
+
+
 def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
     the_pdf, param_names, param_space, maxgen,
     which_cmap=plt.cm.viridis, save_jpg=False, df_tot=[]):
@@ -767,7 +1019,7 @@ def fitnessplot(df, yval, params_error_1sig, params_error_2sig,
                 np.max(df[yval])*1.10)
 
     # Colorbar
-    cbar = plt.colorbar(scat0, orientation='horizontal')
+    cbar = plt.colorbar(scat0, orientation='horizontal', ax=ax[-1,-1])
     cbar.ax.set_title('Generation')
 
     # Set title
@@ -813,6 +1065,7 @@ def fitnessplot_per_parameter(df, xval, params_error_1sig, params_error_2sig,
     """
 
     # Only consider models that have not crashed
+    df_crash = df[df['chi2'] == 999999999]
     df = df[df['chi2'] < 999999999]
 
     # Prepare colorbar
@@ -869,10 +1122,14 @@ def fitnessplot_per_parameter(df, xval, params_error_1sig, params_error_2sig,
             ax[crow,ccol].text(0.95, 0.95,thebestval,
                 ha='right', va='top', transform=ax[crow,ccol].transAxes)
         else:
+            bins = np.arange(param_space[0] - 0.5 * param_space[2],
+                             param_space[1] + 0.5 * param_space[2],
+                             param_space[2])
             hist_data = [df[xval][df['gen'] == i] for i in range(maxgen)]
-            ax[crow,ccol].hist(hist_data, bins=np.arange(param_space[0],
-                param_space[1], param_space[2]), density=True,
-                color=colors, stacked=True)
+            ax[crow,ccol].hist(hist_data, bins=bins, density=True, color=colors,
+                               stacked=True)
+            ax[crow,ccol].hist(df_crash[xval], histtype="step", color="red",
+                               density=True, bins=bins)
 
         min1sig = params_error_1sig[xval][0]
         max1sig = params_error_1sig[xval][1]
@@ -901,7 +1158,7 @@ def fitnessplot_per_parameter(df, xval, params_error_1sig, params_error_2sig,
 
 
     # Colorbar
-    cbar = plt.colorbar(scat0, orientation='horizontal')
+    cbar = plt.colorbar(scat0, orientation='horizontal', ax=ax[-1,-1])
     cbar.ax.set_title('Generation')
 
     # Set title
@@ -1075,6 +1332,13 @@ def correlationplot(the_pdf, df, corrpars):
         figsize=(figsizefact*ncols, figsizefact*nrows),
             sharex='col', sharey='row',
             gridspec_kw={'height_ratios': hratios, 'width_ratios': wratios})
+
+
+    if ncols == 1:
+        ax = np.array([[ax]])
+    elif ncols == 0:
+        plt.close()
+        return the_pdf
 
     # Loop through parameters to create correlation plot
     pairlist = []

@@ -89,6 +89,9 @@ def magnitude_to_radius(teff, band, obsmag, zp_system, Tfrac=0.9,
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'
         waveunit = 'angstrom'
+    elif band == "Johnson_J":
+        filterfile = "Generic_Johnson.J.dat"
+        waveunit = 'angstrom'
     else:
         print('Unknown value for <band>, exiting')
         sys.exit()
@@ -235,6 +238,9 @@ def magnitude_to_radius_SED(sed_wave, sed_flam, band, obsmag, zp_system,
         waveunit = 'angstrom'
     elif band == 'Johnson_V':
         filterfile = 'GCPD_Johnson.V.dat'
+        waveunit = 'angstrom'
+    elif band == "Johnson_J":
+        filterfile = "Generic_Johnson.J.dat"
         waveunit = 'angstrom'
     else:
         print('Unknown value for <band>, exiting')
