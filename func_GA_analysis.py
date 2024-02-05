@@ -572,6 +572,9 @@ def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
     # Read best model names (for plotting of line profiles)
     bestfamily_name = df['run_id'][ind_2sig].values
 
+    n1sig = len(df['run_id'][ind_1sig].values)
+    n2sig = len(df['run_id'][ind_2sig].values)
+
     if incl_deriv:
         best_uncertainty = (best_model_name, bestfamily_name, params_error_1sig,
             params_error_2sig, deriv_params_error_1sig, deriv_params_error_2sig,
@@ -580,7 +583,7 @@ def get_uncertainties(df, dof_tot, npspec, param_names, param_space,
         best_uncertainty = (best_model_name, bestfamily_name, params_error_1sig,
             params_error_2sig, which_statistic)
 
-    return df,best_uncertainty
+    return df,best_uncertainty, n1sig, n2sig
 
 
 def titlepage(df, runname, params_error_1sig, params_error_2sig,
@@ -1198,8 +1201,9 @@ def convergence(the_pdf, df_orig, dof_tot, npspec, param_names, param_space,
         df_tmp = df_orig.copy()[df_orig['gen'] < the_max]
 
         # Compute uncertainties
-        df_tmp, best_uncertainty = get_uncertainties(df_tmp, dof_tot,
-            npspec, param_names, param_space, deriv_pars, incl_deriv=False)
+        df_tmp, best_uncertainty, n1sig, n2sig = get_uncertainties(df_tmp,
+            dof_tot, npspec, param_names, param_space, deriv_pars,
+            incl_deriv=False)
 
         # Unpack all computed values
         best_model_name, bestfamily_name, params_error_1sig, \

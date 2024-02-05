@@ -155,8 +155,9 @@ df, deriv_pars = fga.more_parameters(df, param_names, fix_names, fix_vals)
 ###############################################################################
 
 # Compute uncertainties
-df, best_uncertainty = fga.get_uncertainties(df, dof_tot, npspec,
-    param_names, param_space, deriv_pars, incl_deriv=True)
+df, best_uncertainty, n1sig, n2sig = fga.get_uncertainties(df, dof_tot,
+    npspec, param_names, param_space, deriv_pars, incl_deriv=True)
+np.savetxt(outpath + 'n_1sig_2sig.txt', np.array([n1sig, n2sig]))
 
 # Unpack all computed values
 best_model_name, bestfamily_name, params_error_1sig, \
@@ -190,23 +191,13 @@ with PdfPages(pdfname) as the_pdf:
 
     if not args.fast:
         #  Create correlation plots
+        corr_vars = ['teff', 'logg', 'yhe', 'vrot', 'micro']
+        params_corr = [value for value in param_names if value in corr_vars]
+        the_pdf = fga.correlationplot(the_pdf, df,params_corr)
 
-        make_cplot_tmp = True
-        for apar in ['teff', 'logg', 'yhe', 'vrot', 'micro']:
-            if not apar in param_names:
-                make_cplot_tmp = False
-
-        the_pdf = fga.correlationplot(the_pdf, df,
-            ['teff', 'logg', 'yhe', 'vrot', 'micro'])
-
-        make_cplot_tmp = True
-        for apar in ['mdot', 'beta', 'fclump', 'fic', 'fvel', 'vcl', 'logxlum']:
-            if not apar in param_names and not apar in deriv_pars:
-                make_cplot_tmp = False
-
-        if make_cplot_tmp:
-            the_pdf = fga.correlationplot(the_pdf, df,
-                ['mdot', 'beta', 'fclump', 'fic', 'fvel', 'vcl', 'logxlum'])
+        corr_vars = ['mdot', 'beta', 'fclump', 'fic', 'fvel', 'vcl']
+        params_corr = [value for value in param_names if value in corr_vars]
+        the_pdf = fga.correlationplot(the_pdf, df,params_corr)
 
         # Convergence plot
         the_pdf = fga.convergence(the_pdf, df_orig, dof_tot, npspec,
