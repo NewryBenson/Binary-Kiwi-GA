@@ -578,7 +578,7 @@ def parallelcrop(list1, list2, list3, start_list1, stop_list1):
 
     newlist1 = list1[(list1 > start_list1) & (list1 < stop_list1)]
     newlist2 = list2[(list1 > start_list1) & (list1 < stop_list1)]
-    if list3 == []:
+    if len(list3) == 0:
         return newlist1, newlist2
     else:
         newlist3 = list3[(list1 > start_list1) & (list1 < stop_list1)]
@@ -659,7 +659,7 @@ def read_data(flinelist, fnorm):
         if rv[i] != 0.0:
             wv = rvshift(wv, rv[i])
         data_per_line.append([wv, nm, er])
-    data_per_line = np.array(data_per_line)
+    data_per_line = np.array(data_per_line, dtype="object")
 
     return names, res, data_per_line, lw
 
@@ -869,8 +869,8 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         delta_wave = wave_mod[1] - wave_mod[0]
         addwave_left = wave_mod[0] - delta_wave
         addwave_right =  wave_mod[-1] + delta_wave
-        wave_ext1 = np.array([min(wave_mod) - 90., addwave_left])
-        wave_ext2 = np.array([addwave_right, max(wave_mod) + 90.])
+        wave_ext1 = np.array([min(wave_mod) * 0.95, addwave_left])
+        wave_ext2 = np.array([addwave_right, max(wave_mod) * 1.05])
         cont_ext = np.array([1.0, 1.0])
         # Add the points to the existing arrays
         wave_mod = np.concatenate((wave_ext1, wave_mod))

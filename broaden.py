@@ -29,7 +29,7 @@ from scipy.signal import convolve
 from scipy.stats import norm
 
 
-def broaden_fwline(wlc, flux, vrot, resolution, vmacro=0):
+def broaden_fwline__old__(wlc, flux, vrot, resolution, vmacro=0):
     """
     Broadens a model line profile corresponding with the given rotational velocity, spectral resolution and if provided
     macro turbulent velocity.
@@ -126,9 +126,105 @@ def broaden_fwline(wlc, flux, vrot, resolution, vmacro=0):
 
     return convolved_wave_all, convolved_flux_all
 
-    # np.savetxt(arguments.fileName + ".fin", np.array([convolved_wave_all, convolved_flux_all]).T)
-    #
-    # exit()
+
+def broaden_fw_line(wlc, flux, vrot, resolution, vmacro=0):
+    """
+    Broadens a model line profile corresponding with the given rotational velocity, spectral resolution and if provided
+    macro turbulent velocity. Now rewritten to take into account large wavelength variations, to give reasonable results
+    from the UV to the MIR. This is done by scaling the binning/resolution by the resolving power at the given
+    wavelength.
+    :param wlc:         Wavelength points of the data, in Angstrom, array
+    :param flux:        Flux of the data points (might need to be normalized), array
+    :param vrot:        Rotational velocity of the star (vsini), in km/s, scalar
+    :param resolution:  Desired spectral resolution at this wavelength. unitless, scalar
+    :param vmacro:      Desired macro turbulent velocity, in km/s, scalar
+    :return: wave, flux arrays, with the wavelength points made uniform and linear. Flux after broadening.
+    """
+    # Settings for rebinning
+    mean_wlc = np.mean(wlc)
+    # Currently set to oversampling the resolving power by a factor 10 or at most 0.01 Angstrom
+    binSize = max(0.01, 0.1 * mean_wlc / resolution)  # Size of wavelength bins resampled spectrum (Angstrom)
+    finalBins = max(0.01, 0.1 * mean_wlc / resolution)  # Size of wavelength bins of broadened spectrum (Angstrom)
+
+    limbDark = 0.6  # Limb darkening coefficient (rotational broadening)
+
+    # Settings for large wavelength intervals
+    # Uses 500 times the resolving power or 100 Angstrom depending on what is larger.
+    range_fast = max(100, 500 * mean_wlc / resolution)  # Angstrom. Maximum width of range for using fast broadening
+    overlap = 0.2 * range_fast # Extend the range to account for edges
+
+    # Resample input spectrum to even wavelength bins of <binSize> Angstrom
+    newWlc = np.arange(wlc[0] + binSize, wlc[-1] - binSize, binSize)
+    flux = np.interp(newWlc, wlc, flux)
+    wlc = newWlc
+
+    # Check the total width of the wavelength interval
+    # If this is smaller than a certain value, apply the fast broadening,
+    # i.e. one kernel for all wavelengths
+    # If the wavelength interval is large, then cut the interval into
+    # pieces, use an appropiate interval for each piece, and stitch together.
+    totalwidth = wlc[-1] - wlc[0]
+    if totalwidth < range_fast:
+
+        # Apply the broadening.
+        flux = broaden_function(wlc, flux, resolution, vrot,
+                                vmacro=vmacro, limbdark=limbDark, nsig=4.)
+
+        # Resample to <finalBins> Angstrom
+        if finalBins != binSize:
+            newWlc = np.arange(wlc[0] + finalBins, wlc[-1] - finalBins, finalBins)
+            flux = np.interp(newWlc, wlc, flux)
+        convolved_flux_all = flux
+        convolved_wave_all = newWlc
+
+    else:
+        nparts = int(ceil(totalwidth / range_fast))
+        partwidth = totalwidth / nparts
+        lenbins = len(wlc[wlc < wlc[0] + partwidth])
+        partwidthext = partwidth + overlap
+        lenbinsext = len(wlc[wlc < wlc[0] + partwidthext])
+        extrabins = lenbinsext - lenbins
+
+        idxlow_list = []
+        idxhigh_list = []
+        for i in range(nparts):
+            idxlow = max(0, i * lenbins - extrabins)
+            idxhigh = min(i * lenbins + lenbins + extrabins, len(wlc))
+
+            idxlow_list.append(idxlow)
+            idxhigh_list.append(idxhigh)
+
+        convolved_flux_all = np.array([])
+        convolved_wave_all = np.array([])
+
+        for startarg, endarg, counter in zip(idxlow_list, idxhigh_list, range(nparts)):
+            wlcpart = wlc[startarg:endarg]
+            fluxpart = flux[startarg:endarg]
+
+            # Apply the broadening.
+            fluxpart = broaden_function(wlcpart, fluxpart, resolution, vrot,
+                                    vmacro=vmacro, limbdark=limbDark, nsig=4.)
+
+            # Resample to <finalBins> Angstrom
+            if finalBins != binSize:
+                newWlcpart = np.arange(wlcpart[0] + finalBins, wlcpart[-1] - finalBins, finalBins)
+                fluxpart = np.interp(newWlcpart, wlcpart, fluxpart)
+                wlcpart = newWlcpart
+
+            if counter == 0:
+                wlcpart = wlcpart[0:-extrabins]
+                fluxpart = fluxpart[0:-extrabins]
+            elif counter == nparts - 1:
+                wlcpart = wlcpart[extrabins:]
+                fluxpart = fluxpart[extrabins:]
+            else:
+                wlcpart = wlcpart[extrabins:-extrabins]
+                fluxpart = fluxpart[extrabins:-extrabins]
+
+            convolved_flux_all = np.concatenate((convolved_flux_all, fluxpart))
+            convolved_wave_all = np.concatenate((convolved_wave_all, wlcpart))
+
+    return convolved_wave_all, convolved_flux_all
 
 
 def parseArguments():
