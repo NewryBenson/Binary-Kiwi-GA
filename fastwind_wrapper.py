@@ -868,7 +868,7 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
         # Store values in array to be concatenated
         delta_wave = wave_mod[1] - wave_mod[0]
         addwave_left = wave_mod[0] - delta_wave
-        addwave_right =  wave_mod[-1] + delta_wave
+        addwave_right = wave_mod[-1] + delta_wave
         wave_ext1 = np.array([min(wave_mod) * 0.95, addwave_left])
         wave_ext2 = np.array([addwave_right, max(wave_mod) * 1.05])
         cont_ext = np.array([1.0, 1.0])
@@ -966,7 +966,8 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
 
         fitnesses_lines = 1./np.array(rchi2_lines)
 
-    except:
+    except Exception as error:
+        print(f"Model fitness assessment failed due to {error}")
         return failed_model(linenames)
 
     ####################### FITNESS MEASURE #######################
