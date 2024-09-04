@@ -831,7 +831,8 @@ def run_fw(modatom, moddir, modname, fwtime, lineinfo):
     # broadening to the fastwind OUT. files.
     try:
         return apply_broadening(modname, moddir, linenames, lineres)
-    except:
+    except Exception as error:
+        print(f"Application of broadening failed due to {error}")
         return 0
 
 def interp_modflux(wave_data, wave_mod, flux_mod):
