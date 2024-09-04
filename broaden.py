@@ -127,7 +127,7 @@ def broaden_fwline__old__(wlc, flux, vrot, resolution, vmacro=0):
     return convolved_wave_all, convolved_flux_all
 
 
-def broaden_fw_line(wlc, flux, vrot, resolution, vmacro=0):
+def broaden_fwline(wlc, flux, vrot, resolution, vmacro=0):
     """
     Broadens a model line profile corresponding with the given rotational velocity, spectral resolution and if provided
     macro turbulent velocity. Now rewritten to take into account large wavelength variations, to give reasonable results

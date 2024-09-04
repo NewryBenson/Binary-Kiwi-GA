@@ -832,7 +832,7 @@ def run_fw(modatom, moddir, modname, fwtime, lineinfo):
     try:
         return apply_broadening(modname, moddir, linenames, lineres)
     except Exception as error:
-        print(f"Application of broadening failed due to {error}")
+        print(f"Application of broadening failed due to {error}", flush=True)
         return 0
 
 def interp_modflux(wave_data, wave_mod, flux_mod):
@@ -968,7 +968,7 @@ def assess_fitness(moddir, modname, lineinfo, lenfree, fitmeasure):
         fitnesses_lines = 1./np.array(rchi2_lines)
 
     except Exception as error:
-        print(f"Model fitness assessment failed due to {error}")
+        print(f"Model fitness assessment failed due to {error}", flush=True)
         return failed_model(linenames)
 
     ####################### FITNESS MEASURE #######################
