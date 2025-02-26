@@ -26,14 +26,15 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import fastwind_wrapper as fw
 import population as pop
+import cluster_inputs as ci
 
-jobscriptfile = 'run_kiwiGA.job' # name of job script file 
-hours_str = '120' # maximum wall time -- but see below!
+jobscriptfile = 'run_kiwiGA.job' # name of job script file
+hours_str = ci.max_wall_time # maximum wall time -- but see below!
 walltime_flex = True # adjust maximum wall time depending on ngen
-hrs_gen = 1.1 # hours per generation if walltime_flex
-n_cpu_core = 128.0 # number of CPUs per node
-username = 'sbrands'
-codedir = 'Kiwi-GA'
+hrs_gen = ci.time_per_gen # hours per generation if walltime_flex
+n_cpu_core = ci.cores_per_node  # number of CPUs per node
+username = ci.username
+codedir = ci.codedir  # 'Kiwi-GA'
 
 
 # For spectral regions wider than this, an extra wide plot will be made.
@@ -966,16 +967,7 @@ if bc > 0:
     pdfs.append(spectrum_fig2)
     reportPDF.savefig()
         
-print('       >  Plotted spectrum and line selection') 
-
-# merger = PdfFileMerger()
-
-# for pdf in pdfs:
-#     merger.append(pdf)
-#
-# merger.write(merged_report)
-# merger.close()
-
+print('       >  Plotted spectrum and line selection')
 
 reportPDF.close()
 for pdf in pdfs:
@@ -990,69 +982,67 @@ else:
     ucx_string = ''
     run_string = '    srun --mpi=pmi2 -n $ncpu python3 kiwiGA.py ${runname}'
 
-jobscriptlines = ['#!/bin/bash',
-'#SBATCH --job-name=' + run_name,
-'#SBATCH -t ' + hours_str + ':00:00',
-'#SBATCH -N ' + str(n_node),
-'#SBATCH -n ' + str(n_cpu),
-'#SBATCH --no-requeue',
-'',
-'runname=' + run_name,
-'do_restart=' + do_restart,
-'ncpu=' + str(ctrldct["nind"]+1),
-'inidir=' + test_inidir,
-'',
-'echo Run ${runname}',
-'echo Using $ncpu CPUs',
-'echo Do restart? $do_restart',
-'',
-'# Load modules',
-'module load 2021',
-'module load foss/2021a',
-#'module load SciPy-bundle/2021.05-foss-2021a',
-'module load Python/3.9.5-GCCcore-10.3.0',
-'',
-'# Define paths',
-'scratch=/scratch-shared/' + username + '/${runname}/',
-'homedir=/home/' + username + '/' + codedir + '/',
-'',
-'echo Copying files',
-'',
-'# Create and copy directories and files',
-'mkdir -p $scratch',
-'cp -r ${homedir}*.py $scratch',
-'cp -r ${homedir}filter_transmissions $scratch',
-'mkdir -p ${scratch}input/',
-'mkdir -p ${scratch}input/${runname}/',
-'cp -r ${homedir}input/${runname}/* ${scratch}input/${runname}/.',
-'cp -r ${homedir}${inidir} $scratch',
-'',
-'# Navigate to computation directory',
-'cd $scratch',
-'',
-'echo Starting run!',
-'date',
-'',
-ucx_string,
-'',
-'# Start run',
-'if [ "$do_restart" == "yes" ]',
-'then',
-'    echo ...restarting run',
-run_string + ' -c',
-'else',
-'    echo ... creating output dir',
-'    mkdir -p output',
-'    echo ... starting run',
-run_string,
-'fi',
-'',
-'date',
-'echo ... Run ENDED!']
 
-with open(jobscriptfile,'w') as f:
-    for aline in jobscriptlines:
-        f.write(aline + '\n')
+jobscript = f"""#!/bin/bash
+#SBATCH --job-name={run_name}
+#SBATCH --time {hours_str}:00:00
+#SBATCH -N {str(n_node)}
+#SBATCH --ntasks-per-node={ci.cores_per_node}
+#SBATCH --no-requeue
+{ci.extra_sbatch % (run_name, run_name)}
+
+runname={run_name}
+do_restart={do_restart}
+ncpu={str(ctrldct["nind"]+1)}
+inidir={test_inidir}
+
+echo Run ${{runname}}
+echo Using $ncpu CPUs
+echo Do restart? $do_restart
+
+# Load modules
+{ci.modules}
+
+# Define paths
+scratch=/{ci.scratch_loc}/{username}/${{runname}}/
+homedir=/{ci.home_loc}/{username}/{codedir}/
+
+echo Copying files
+
+# Create and copy directories and files
+mkdir -p $scratch
+cp -r ${{homedir}}*.py $scratch
+cp -r ${{homedir}}filter_transmissions $scratch
+mkdir -p ${{scratch}}input/
+mkdir -p ${{scratch}}input/${{runname}}/
+cp -r ${{homedir}}input/${{runname}}/* ${{scratch}}input/${{runname}}/.
+cp -r ${{homedir}}${{inidir}} $scratch
+
+# Navigate to computation directory
+cd $scratch
+
+echo Starting run!
+date
+
+# Start run
+if [ "$do_restart" == "yes" ]
+then
+    echo ...restarting run
+    {run_string}
+else
+    echo ... creating output dir
+    mkdir -p output
+    echo ... starting run
+    {run_string}
+fi
+
+date
+echo ... Run ENDED!
+"""
+
+f = open(jobscriptfile, "w")
+f.write(jobscript)
+f.close()
 
 if do_restart == 'no':
     print('\nCreated ' + jobscriptfile + ' --- NO restart')

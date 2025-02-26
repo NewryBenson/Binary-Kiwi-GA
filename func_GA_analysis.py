@@ -1275,7 +1275,9 @@ def lineprofiles(df, spectdct, linedct, savedmoddir,
         ax[crow,ccol].plot(bestmodwave, bestmodflux, color='#1ca641', lw=2.4,
             alpha=1.0)
         ax[crow,ccol].set_xlim(linedct['left'][i], linedct['right'][i])
-        ax[crow,ccol].set_ylim(*ax[crow,ccol].get_ylim())
+        # ax[crow,ccol].set_ylim(*ax[crow,ccol].get_ylim())
+        ax[crow,ccol].set_ylim(np.min([np.min(flux_tmp) * 0.95, np.min(lineflux_min) * 0.95]),
+                               np.max([np.max(flux_tmp) * 1.05, np.max(lineflux_max) * 1.05]))
 
         # plot an extra fastwind model
         if not extra_fwmod == '/':

@@ -839,7 +839,7 @@ def interp_modflux(wave_data, wave_mod, flux_mod):
     """Interpolate the flux of the model lines so that they are
     mapped to the same wavelengths as the data
     """
-    fmod = interpolate.interp1d(wave_mod, flux_mod)
+    fmod = interpolate.interp1d(wave_mod, flux_mod, fill_value=1.)
     flux_interp = fmod(wave_data)
     return flux_interp
 
@@ -886,7 +886,7 @@ def calc_chi2_line(resdct, nme, linefile, lenfp, maxlen=150):
     dof_line = np_line - lenfp
     rchi2_line = chi2_line / dof_line
 
-    if len(wave_mod) > maxlen:
+    if len(wave_mod) != maxlen:
         # Adjust maxlen in case of a CMF line
         if nme.startswith('UV_'):
             delta_wave_data = wave_data[1] - wave_data[0]
