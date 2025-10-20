@@ -1,0 +1,12 @@
+welke params gebruiken, welke vrij, wat aanpassen van 1 naar 2 | nog niet gedaan
+
+plots opschoonen | check
+kiwiga example runnen | problemen in de cluster met aantal cores
+
+met create indat een nieuwe indat maken voor b2 en die runnen met run_vw in de wrapper script | nog niet gedaan
+
+spectrum opstellen: lijn HII 6527 zit reeds in Halpha?
+
+
+
+
