@@ -1,0 +1,56 @@
+237a238,244
+> !
+> !     version 7.4.1 nov 2022: inclusion of Lemke's Stark broadening for
+> !                   potentially all hydrogen levels
+> !                   default: Balmer-lines + important HeII lines: Butler
+> !                            Paschen & Brackett lines until 
+> !                            upper level = 10: Lemke (correct)
+> !                            other hydrogen and HeII lines: Griem
+243,244c250
+< 
+< 
+---
+> !
+267,268c273,278
+< LOGICAL BALMER_LEMKE  
+< ! if true, Balmer Stark profiles from Lemke will be used 
+---
+> LOGICAL BALMER_LEMKE, PB_LEMKE  
+> ! if true, Balmer and or Paschen/Brackett Stark profiles
+> ! from Lemke will be used until nu=10, otherwise (nu>10) Griem
+> ! BALMER_LEMKE only for specific tests (default false),
+> ! PB=Paschen/Brackett default true, otherwise Griem-broadening
+> ! for all upper levels
+271c281
+< CHARACTER BROAD_BALMER*6,VTURB_STR*60
+---
+> CHARACTER BROAD_BALMER*6,BROAD_PB*6,VTURB_STR*60
+335a346
+> !BROAD_BALMER='LEMKE'
+337c348
+< !PRINT *,' IN CASE, SPECIFY STARK BROADENING OF BALMER LINES:'
+---
+> !PRINT *,' IN CASE, SPECIFY STARK BROADENING FOR BALMER LINES:'
+342a354,362
+> !BROAD_PB='GRIEM'
+> BROAD_PB='LEMKE'
+> !uncomment for tests with Lemke broadening functions
+> !PRINT *,' IN CASE, SPECIFY STARK BROADENING FOR PASCHEN/BRACKETT LINES:'
+> !PRINT *,' GRIEM(DEFAULT FROM NU=11 ALWAYS) or LEMKE (DEFAULT UNTIL NU=10)'
+> !READ (*,FMT='(A)',END=6) BROAD_PB
+> 
+> !6 IF(BROAD_PB.EQ.'') BROAD_PB ='LEMKE'
+> 
+343a364
+> IF(BROAD_PB .NE.'GRIEM'  .AND. BROAD_PB .NE.'LEMKE ') STOP ' WRONG PASCHEN/BRACKETT BROADENING'
+349a371,376
+> PB_LEMKE=.FALSE.
+> IF (BROAD_PB.EQ.'LEMKE') PB_LEMKE=.TRUE.
+> 
+> PRINT*,' PASCHEN/BRACKETT LINE BROADENING (UNTIL NU=10) FOLLOWING ',BROAD_PB
+> PRINT*,' PASCHEN/BRACKETT LINE BROADENING (FROM  NU=11) FOLLOWING GRIEM'
+> 
+473c500
+<      CALL PREFORMAL(FILE,NCO,LEVEL(1,NLI),LEVEU(1,NLI),LINENO(1,NLI),NSTARK,VTURB,YHE,BALMER_LEMKE)
+---
+>      CALL PREFORMAL(FILE,NCO,LEVEL(1,NLI),LEVEU(1,NLI),LINENO(1,NLI),NSTARK,VTURB,YHE,BALMER_LEMKE,PB_LEMKE)

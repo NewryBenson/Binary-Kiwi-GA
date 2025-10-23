@@ -1,0 +1,244 @@
+New Releases
+
+Version 8.3
+
+after hundreds of tests the new release of FASTWIND can be downloaded. The
+major improvements compared to older releases are
+
+vers. 8.3   new data for background elements (ATOMDAT_NEW)
+vers. 8.3.1 stable temperature correction scheme
+
+If you already have the new atomic-data, please download at least the new
+programs (-> newprog.tgz).
+
+Otherwise, download the complete inicalc.tgz and update your programs.
+
+I hope that this release will be valid for the next (two) years or so, with
+the major exeption that there will be updates concerning clumping and some
+specific items concerning the treatment of resonances in the cross-sections.
+
+directory inicalc_v8.6 contains the last version of this distribution
+
+------------------------------------------------------------------------------
+Version 9
+
+Update to nlte v9.x and nlte_approx v6.x 
+
+PLEASE READ THE docu.txt carefully; a lot of things have changed/improved
+
+major changes:
+
+frequency grid automatically adapted in dimes (as a function of atomic model)
+
+suggested default value for ND = 51 (instead of 47), in order to
+resolve photospheric/wind transition point (for IR calculations)
+(see dimes.f90)
+
+implementation of various clumping laws (see nlte.f90 subroutine clumping)
+
+improved treatment of ionisation from excited levels
+(new file inicalc/ATOMDAT_NEW/atomnl2_meta_v2.0 required)
+
+background abundances now in file (inicalc/ATOMDAT_NEW/abundan_solar)
+see docu.txt
+
+couple of more output collected: 
+most important: file ABUNDAN in model-catalogue, saves all info
+clumping factor in OUT_TOT; new structure name: struct.fcl
+
+dielectronic recombination correctly treated if opacity tables are used:
+approach: convolution with gaussian of sufficient width
+
+WHAT HAS TO BE DOWNLOADED?
+
+To ensure that you have everything updated I suggest that you download
+everything (also the idl-routines have changed)
+
+directory inicalc_v9x contains the last version of this distribution
+
+for your convenience, there is also a tgz version of this distro available
+
+The only (longer) files which have not changed are ATOMDAT/nl3*
+you might scipt these files when copying
+
+
+------------------------------------------------------------------------------
+
+still missing/to be updated soon:
+
+solution of HeI singlet/triplet problem (cf. Najarro et al 2006, A&A)
+
+influence of single elements on T-structure (sometimes, the NLTE-bump
+is predicted as too large in very thin winds. Has an influence on few IR
+lines)
+
+dielectronic recombination in alternative treatment (accounting explicitely
+for stabilizing lines)
+
+-----------------------------------------------------------------------------
+
+Version 10.1/7.1
+
+The code has been substantially updated. These updates can be controlled by
+three options in the new module nlteopt (in nlte.f90). By default, these
+options are set to true. Set them to false if you want to come back (almost)
+to the old v9 (standard). Note, however, that there are also some minor
+updates which affect the older versions, so that you will not obtain
+*identical* (but very similar) models, occ-numbers and profiles.
+
+Note that the new code needs roughly 30-50% more comp. time than before.
+
+
+-- OPTSTARK = .TRUE. : Approximate Stark/Voigt broadening included in 
+                       calculation of background-element fluxes.
+		       This results in a reasonable representation of the
+		       Lyman jump (not applied to the Balmer jump so far)
+		       
+-- OPTPHOTLINES = .TRUE.: correct radiative transfer treatment for the most
+                       important the lines from background elements 
+		       (instead of the previous Sobolev-solution). 
+		       This avoids too strong overpopulation
+		       of the upper levels and the corresponding T-bump
+		       in the outer photosphere.
+
+-- UPDATE_STRUCT = .TRUE.: one additional iteration (at IT approx 12) to
+                       obtain realistic photospheric grad(lines), by using
+		       the flux-mean (from the current NLTE opacities) instead
+		       of the Rosseland mean. (proven: one iteration is enough)
+
+-- OPTDR =.TRUE.       Di-electronic recombination included for the
+                       background elements, following the treatmeant of
+		       considering the stabilizing lines explicitely.
+		       
+		       The DR-treatment of the explicit elements is controlled
+		       by the atomic *.dat file. Usually, we use the DR's as
+		       included in the ionization cross sections (from the OP),
+		       but alternatively also the 2nd method (explicit
+                       stabilizing transitions) can be used if specified in 
+		       the *.dat file.
+		       
+The major changes (w.r.t. A10HHe) affect the dwarfs in the range between 
+30 to 35 kK, where the HeII lines become stronger due to a different T 
+and ne structure. For supergiants and hot/cool objects, the differences 
+with ALL previous versions are small. 
+
+Regarding differences for explicit ions (e.g., Si), the same should be true, 
+but has not been tested yet.
+
+
+Further change: Experienced users might know that a change in abundance
+of explicit metals can be easily and fast computed when the model
+is restarted (ITLAST > 20), with changed abundance.
+In previous versions, the metallic background has been kept constant, except
+for the continuum of the explicit elements.
+
+Now, if the abundance is changed by more than 20%, the metallic background
+is consistently iterated, to account also for modified *line*-blocking
+effects. Still, since the model now longer changes (the effects on T and rho
+are discarded), and H/He are almost not affected, the convergence is fast,
+and for such a restarted model only order of 15 iterations are required
+(compared to a complete model, which needs 40 to 60 iterations)
+
+>---------------------------------------------------------------------------
+		       
+FORMAL: up to 20 overlapping/non-overlapping transitions can be 
+calculated now in one run (compared to 2 transitions before)
+
+>---------------------------------------------------------------------------
+
+Model-atoms provided
+A10HHe as before, to be used with FORMAL_INPUT_A10HHe and LINES_Si.dat
+A10HHeSi (old Si-model), to be used with FORMAL_INPUT_A10HHeSi and LINES_Si.dat
+A10HHeN2345 (old N2, new N3-N5 models), to be used with FORMAL_INPUT_A10HHeN2345 
+     and LINES_N2345.dat.
+     Note: modifications might be required after first detailed comparisons
+     with obs are done!
+     Note also: so far, old NII model atom implented, since Norbert P. 
+     is presently updating this model (actually, already done); will be 
+     transfered in the future. Comparisons new vs old not so bad.
+     
+More notes on the new N-model can be found in N2345.txt     
+     
+In case, modify your Makefile!!!!
+
+>---------------------------------------------------------------------------
+
+Don't forget to change your abundance_solar file (ATOMDAT_NEW)!!!
+
+Still default: abundan_solar = abundan_solar_new (old Grevesse et al. values)
+
+copy abundan_solar_new to abundan_solar if you want to use the new Asplund
+data
+
+For the rest, see docu.txt and the description of the changes in the header
+of nlte.f90 and nlte_approx.f90.
+
+IMPORTANT NOTE: The new version v10.1/7.1 has been deeply tested for the
+A10HHe and A10HHeN2345 version and Teff > 20 kK. 
+Except for probable changes to finalize the N-model atom, 
+everything should run reliably.
+
+Regarding the Si-model (old and new), on the other hand, only few tests have
+been performed. This is also true for Teff < 20kK. Please report problems to
+
+-----------------------------------------------------------------------------
+until Version 10.4.7 lots of improvements, incl.  Xrays (v10.2), 
+optically thick clumping (v10.3), and improved X-ray description (v10.4)
+
+see fastwind papers (II-IV, and X-ray part from V)
+
+Version v10.5: compatible with gfortran; copy Makefile_gfortran
+to workdir/Makefile
+
+-----------------------------------------------------------------------------
+version 10.6
+
+- new Lines.dat file LINES_CNOSi_new_coll.dat:
+  checked, including updated collisional broadening data from Kurucz.
+  new NIII lines at 3355/3366, broadening data *not* included
+  
+  should be used (and updated) for all further calculations.
+  
+- frequency grid improved, to obtain similar/comparable solutions 
+  for different atomic data files (new file ADD_FREQUENCIES created) 
+  
+- line-blocking calculations improved (for Stark-broadened lines)  
+
+- changes (compared to older versions) possible, in particular for
+  high gravity B-stars
+  
+- old bug due to Jon S removed (w.r.t. optically thick clumping) 
+ 
+- UV-line profiles were sometimes erroneously normalized.
+  Normalization now been improved. If there is something rotten, a
+  profile with all values set to zero will be created. In this
+  case, check output
+ 
+- NOTE: after some quick inspections, it turned out that the carbon
+  model atom might need some updates (future work).
+
+- report any problems/inconsistencies to Jo
+
+- check version history in nlte.f90, nlte_approx.f90, formalsol.f90  
+
+v10.6.4
+
+- inclusion of improved C-atom ("Cnew", II,III,IV), with corresponding data
+  (in OP_DATA_NEW, with qualifyer 'xop' and 'nah'), and file-reading
+   options. For certain cross-sections, FFT is now carried out in
+   quadruple precision)
+
+- tested in O-star regime, and few B-star applications
+
+- there is a certain problem when the complete model (Cnew,N,O,Si) is
+  calculated, since optical NV lines become stronger as when calculated
+  with N2345 alone. The reason is more pumping of N5_3, because of a
+  higher radiation temperature around 267 A. Needs to be improved in
+  near future
+
+- for other changes, see nlte.f90 and nlte_approx.f90
+
+Happy computing!
+
+
+Jo Puls

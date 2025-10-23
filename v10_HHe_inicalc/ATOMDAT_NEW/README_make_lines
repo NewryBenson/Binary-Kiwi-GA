@@ -1,0 +1,23 @@
+compile with 
+
+ifort make_lines.f90
+
+Creates LINES_ADI.dat for specified elements, to provide info
+on depacked components when using Adi's model atoms.
+
+e.g., (Adi's data)
+A10HHeN.dat corresponds with LINES_ADI.dat and FORMAL_INPUT_N_adi
+
+whilst (standard data)
+A10HHeN2345.dat corresponds with LINES_N2345.dat and FORMAL_INPUT_A10HHeN2345
+
+NOTE: take care in Makefile that consistent LINES_xxx.dat file is
+written to ATOM_FILE
+
+NOTE also that optical NII lines (at least most) are provided in air
+in long (depacked) line-files. Thus far, for these lines we use a
+specific treatment NOT to change the wavelength (vacumm -> air for
+lambda > 2000 A) in make_lines.f90. [other lines are converted].
+
+Note also that LINES_ADI.dat can be used with formalsol, but all
+damping coefficients have been set to zero.

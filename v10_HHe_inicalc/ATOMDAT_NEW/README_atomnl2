@@ -1,0 +1,5 @@
+atomnl2_meta and atomnl2_meta_v1.0 identical: 
+  old versions until nlte_approx.f90 version5.x
+  
+atomnl2_meta_v2.0 from nlte_approx.f90 v6.0: 
+  update for ionization from excited levels   

@@ -1,0 +1,171 @@
+:T
+:T Lines.dat: Version compatible to FASTWIND data set CNOMgSi
+:T
+:T Notes: 
+:T      i. Oscillator strengths are gij fj/Sum(gi), check for consistency
+:T         required
+:T     ii. Last two columns correspond to Number of line and Sum(gi) 
+:T     iii. Wavelengths are wavelengths in air
+:T     iv. Both damping constants are divided by 4pi 
+:T      v. The multiplet is identified by the NIST database number. 
+:T     vi. Radiative lifetimes from VALD/NIST databases
+:T    vii. Collisional damping from VALD or according to Cowly (1971)
+:T
+:T Setup: Miguel A. Urbaneja
+:T Last revision: 17/12/2002
+:T
+:V2    
+:T
+:T *******************************************************************
+:T            SILICION    SiIII SiIV (Using Norbert data from SURFACE)
+:T ********************************************************************
+:T
+:T  ---------------------------------------------
+:T  DEFINITION OF SILICON III LINES
+:T  ---------------------------------------------
+:T  ALL TRANSITION WAVELENGTHS FROM NIST3.1.0
+:T  COLL. BROADENING COEFFICIENTS ACCORDING TO COWLEY (1970)
+:T  GF VALUES FROM NIST3.1.0
+:T  RADIATIVE LIFETIMES FROM OPACITY PROJECT
+ CL TY  RBB  2  7 RBB
+  34S3S   34P3P  1 4552.622    .6529     2.19E+8   0.0   0.0   6.90E-7 3
+  34S3S   34P3P  2 4567.840    .3898     2.19E+8   0.0   0.0   6.90E-7 3
+  34S3S   34P3P  3 4574.757    .1300     2.19E+8   0.0   0.0   5.49E-8 3
+
+:T34S3S    34P3P  1 4552.622   0.5057   9.57E7    0.    0.    8.06E-7   3. 
+:T34S3S    34P3P  2 4567.840   0.3047   9.57E7    0.    0.    8.06E-7   3.
+:T34S3S    34P3P  3 4574.757   0.1032   9.57E7    0.    0.    8.06E-7   3.  
+
+    
+
+:T   
+   33P21S  34P1P  1 4338.500    .1245     3.47E+8   0.0   0.0   7.01E-7 1
+:T   
+   34S1S   34P1P  1 5739.73     .8017     1.67E+8   0.0   0.0   7.29E-7 1
+:T
+   34D3D   33DP3P 1 6776.63     .0081     2.79E+8   0.0   0.0   2.08E-6 15
+   34D3D   33DP3P 2 6805.03     .0061     2.79E+8   0.0   0.0   2.08E-6 15
+   34D3D   33DP3P 3 6805.28     .0183     2.79E+8   0.0   0.0   2.08E-6 15
+   34D3D   33DP3P 4 6850.94     .0004     2.79E+8   0.0   0.0   2.08E-6 15
+   34D3D   33DP3P 5 6851.20     .0060     2.79E+8   0.0   0.0   2.08E-6 15
+   34D3D   33DP3P 6 6851.76     .0338     2.79E+8   0.0   0.0   2.08E-6 15
+:T   
+   34D3D   35P3P 1 7461.90     .0278     7.36E+8   0.0   0.0   2.02E-6 15
+   34D3D   35P3P 2 7462.35     .0208     7.36E+8   0.0   0.0   2.02E-6 15
+   34D3D   35P3P 3 7462.65     .0626     7.36E+8   0.0   0.0   2.02E-6 15
+   34D3D   35P3P 4 7465.35     .0014     7.36E+8   0.0   0.0   2.02E-6 15
+   34D3D   35P3P 5 7465.65     .0209     7.36E+8   0.0   0.0   2.02E-6 15
+   34D3D   35P3P 6 7466.32     .1167     7.36E+8   0.0   0.0   2.02E-6 15
+:T      
+   34D1D   35F1F 1 4716.654    .6195     2.35E+8   0.0   0.0   2.74E-6 5
+:T 
+   34F1F   35G1G 1 3924.468   1.0302     1.63E+8   0.0   0.0   3.23E-6 7
+:T F-VALUES FOR NEXT FOUR FROM KURUCZ & PEYTREMANN
+   34F3F   35G1G 1 4829.030    .0131     1.97E+8   0.0   0.0   3.37E-6 21
+   34F3F   35G3G 1 4828.950    .5858     1.97E+8   0.0   0.0   3.37E-6 21
+   34F3F   35G3G 2 4829.111    .0165     1.97E+8   0.0   0.0   3.37E-6 21
+   34F3F   35G3G 3 4829.214    .0005     1.97E+8   0.0   0.0   3.37E-6 21
+:T F-VALUES FOR NEXT FOUR FROM MCHF: CALLEGARI & TRIGUEIROS (1998)
+   34F3F   35G3G 4 4813.333    .2143     1.97E+8   0.0   0.0   3.37E-6 21
+
+   34F3F   35G3G 5 4819.712    .2137     1.97E+8   0.0   0.0   3.37E-6 21
+   34F3F   35G3G 6 4819.814    .0263     1.97E+8   0.0   0.0   3.37E-6 21
+   34F3F   35G1G 2 4819.631    .1412     1.97E+8   0.0   0.0   3.37E-6 21   
+
+:T Using the old data for Si in Lines.dat.orig
+
+:T34F3F    35G3G 1 4828.950   0.4165   1.89E8    0.    0.    3.37E-6  21.
+:T34F3F    35G3G 2 4829.111   0.02129  1.89E8    0.    0.    3.37E-6  21.
+:T34F3F    35G3G 3 4829.214   0.00036  1.89E8    0.    0.    3.37E-6  21.
+
+:T34F3F   35G3G 4 4813.333    0.2432   1.89E8    0.    0.    3.37E-6  21
+:T34F3F   35G3G 5 4819.712    0.3193   1.89E8    0.    0.    3.37E-6  21.
+:T34F3F   35G3G 6 4819.814    0.02129  1.89E8    0.    0.    3.37E-6  21.
+
+   
+   35P3P   35D3D 1 8262.57     .5725     5.44E+7   0.0   0.0   3.25E-6 9
+   35P3P   35D3D 2 8265.65     .1023     5.44E+7   0.0   0.0   3.25E-6 9
+   35P3P   35D3D 3 8267.71     .0068     5.44E+7   0.0   0.0   3.25E-6 9
+   35P3P   35D3D 4 8269.33     .3053     5.44E+7   0.0   0.0   3.25E-6 9
+   35P3P   35D3D 5 8271.39     .1020     5.44E+7   0.0   0.0   3.25E-6 9
+   35P3P   35D3D 6 8271.95     .1354     5.44E+7   0.0   0.0   3.25E-6 9
+:T   
+   35F3F   36G3G 1 8190.5      .2715     1.02E+8   0.0   0.0   7.23E-6 21
+   35F3F   36G3G 2 8190.95     .3530     1.02E+8   0.0   0.0   7.23E-6 21
+   35F3F   36G3G 3 8191.08     .0236     1.02E+8   0.0   0.0   7.23E-6 21
+   35F3F   36G3G 4 8191.68     .4632     1.02E+8   0.0   0.0   7.23E-6 21
+   35F3F   36G3G 5 8192.32     .0236     1.02E+8   0.0   0.0   7.23E-6 21
+   35F3F   36G3G 6 8192.45     .0004     1.02E+8   0.0   0.0   7.23E-6 21
+:T WAVELENGTHS & GF VALUES FROM KURUCZ & BELL (1995)
+:T RADIATIVE LIFETIMES FROM COULOMB APPROXIMATION
+   35G3G   36H3H 1 8102.708    .4252     0.36E+08    0.0    0.0   0.73E-05 27
+   35G3G   36H3H 2 8102.997    .5477     0.36E+08    0.0    0.0   0.73E-05 27
+   35G3G   36H3H 3 8103.451    .6656     0.36E+08    0.0    0.0   0.73E-05 27
+:T 
+   35G1G   36H1H 1 8103.227   1.6354     0.46E+08    0.0    0.0   0.73E-05 9
+ 0
+ 
+:T  ---------------------------------------------
+:T  DEFINITION OF SILICON IV LINES
+:T  ---------------------------------------------
+:T  ALL TRANSITION WAVELENGTHS FROM NIST3.1.0,
+:T  COLL. BROADENING COEFFICIENTS ACCORDING TO COWLEY (1970)
+:T  GF VALUES FROM FUHR & WIESE (1998,NIST3.1.0)
+:T  RADIATIVE LIFETIMES FROM OPACITY PROJECT
+ CL TY  RBB  2  7 RBB
+   44S2S   44P2P 1 4088.862    .7816     3.65E+8    0.0    0.0   0.54E-06 2 
+   44S2S   44P2P 2 4116.103    .3881     3.65E+8    0.0    0.0   0.54E-06 2
+:T   
+   44D2D   45P2P 1 3762.431    .1782     1.06E+8    0.0    0.0   0.14E-05 10
+   44D2D   45P2P 2 3762.448    .0199     1.06E+8    0.0    0.0   0.14E-05 10
+   44D2D   45P2P 3 3773.150    .0995     1.06E+8    0.0    0.0   0.14E-05 10
+:T   
+   45S2S   45P2P 1 8957.25    1.0209     2.42E+8    0.0    0.0   0.15E-05 2
+   45S2S   45P2P 2 9018.14     .5093     2.42E+8    0.0    0.0   0.15E-05 2
+:T   
+   45P2P   46S2S 1 4314.102    .0984     1.74E+8    0.0    0.0   0.25E-05 6
+   45P2P   46S2S 2 4328.177    .1985     1.74E+8    0.0    0.0   0.25E-05 6
+:T      
+   45P2P   45D2D 1 6667.57     .5103     8.88E+7    0.0    0.0   0.21E-05 6
+   45P2P   45D2D 2 6701.21     .9138     8.88E+7    0.0    0.0   0.21E-05 6
+   45P2P   45D2D 3 6701.25     .1021     8.88E+7    0.0    0.0   0.21E-05 6
+:T   
+   45D2D   46F2F 1 4212.397    .3483     1.26E+8    0.0    0.0   0.40E-05 10
+   45D2D   46F2F 2 4212.414    .0174     1.26E+8    0.0    0.0   0.40E-05 10
+:T   
+   45D2D   46P2P 1 7047.87     .0300     6.82E+7    0.0    0.0   0.32E-05 10
+   45D2D   46P2P 2 7047.92     .2692     6.82E+7    0.0    0.0   0.32E-05 10
+   45D2D   46P2P 3 7068.39     .1503     6.82E+7    0.0    0.0   0.32E-05 10
+:T   
+   45F2F   46D2D 1 4950.111    .0522     1.81E+8    0.0    0.0   0.40E-05 14
+:T   
+   46D2D   48F2F 1 4403.733    .1671     6.21E+7    0.0    0.0   0.11E-04 10
+:T  
+   46D2D   47F2F 1 6998.36     .5629     8.22E+7    0.0    0.0   0.78E-05 10
+:T WAVELENGTHS & GF VALUES FROM KURUCZ & BELL (1995)
+:T RADIATIVE LIFETIMES FROM COULOMB APPROXIMATION
+   45F2F   46G2G 1 4631.273   1.1759     0.22E+09    0.0    0.0   0.41E-05 14
+:T   
+   45G2G   46H2H 1 4654.312   1.6882     0.12E+09    0.0    0.0   0.41E-05 18
+:T   
+   46F2F   48G2G 1 4667.136    .2457     0.12E+09    0.0    0.0   0.12E-04 14
+:T 
+   46F2F   47G2G 1 7678.749   1.0970     0.13E+09    0.0    0.0   0.80E-05 14
+:T   
+   46G2G   47H2H 1 7718.787   1.5046     0.72E+08    0.0    0.0   0.80E-05 18
+:T GF VALUES FROM COULOMB APPROXIMATION
+   46H2H   47I2I 1 7723.818   2.0079     4.87E+07    0.0    0.0   7.97E-06 22
+ 0
+
+:T *******************************************************************
+:T    P V resonance lines
+:T
+:T fij from VALD database, GammaL and GammaC approximated (see preformal)
+:T
+:T *******************************************************************
+:T     CL  TY  RBB  2  7  RBB
+:T  
+:T P5_1  P5_2  1  1117.977  0.489  1.056E8    0.    0.    9.25E-8    2.
+:T P5_1  P5_2  2  1128.008  0.239  1.056E8    0.    0.    9.25E-8    2.
+:T    0   
+THEEND

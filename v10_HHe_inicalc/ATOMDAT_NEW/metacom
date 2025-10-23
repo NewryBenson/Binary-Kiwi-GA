@@ -1,0 +1,32 @@
+*========================================================================
+*     common blocks for use with program meta.f
+*========================================================================
+
+      parameter (natom=30,nion=11)
+      parameter (nrec=149,nlev=35000) ! large enough for atomgf3
+
+      integer upart(natom)
+      character name(natom)*(2),stage(nion)*(4),meta(5000)*1,
+     +     atom(5000)*11,source(5000)*1,forb(nlev)*1,
+     +     fpath*(*),fpath2*(*),
+     +     metall(natom,nion,50)*1
+
+      real maxgf(5000),ajimax(5000),maxajisub(5000)
+      integer gs_multi(5000),ilowsub(5000)
+
+      parameter 
+     +(fpath=
+     +'/data/data9/rdw/Ascii-Bin-DataInput/Atomic-Models-ASCII/',
+c     +fpath2=
+c     +'/data/data9/rdw/Ascii-Bin-DataInput/Line-List-Bin-Source/')
+     +fpath2='wmbasic_data/')
+
+      common/atom/jmax(natom),ergion(natom,nion),
+     +     ind(nlev),gf(nlev),wave(nlev),kind(nlev),
+     +     kel(nrec),iel(nrec),ilev(nrec),levphi(nrec),ilin(nrec),
+     +     ielev(nrec),rlam(50),jstat(50),cross(100),gcross(100),
+     +     ground(5000),ocross(5000),
+     +     maxgf,ilow(5000),ipop(5000),beta(100),
+     +     sval(100),number,name,stage,upart,meta,forb,
+     +     source,atom,konlev(natom,nion,50),metall,
+     +     gs_multi,ajimax,maxajisub,ilowsub

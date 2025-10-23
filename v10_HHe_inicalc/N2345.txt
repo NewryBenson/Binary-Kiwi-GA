@@ -1,0 +1,107 @@
+Some comments to the new N2345 model atom:
+
+We performed litterally hundreds of tests, comparing with approx. 150
+Gal/LMC/SMC stars on the observationally side, and comparing with
+detail/surface for the accuracy of NII (old model atom) and NIII-NV with
+cmfgen.
+
+Recommended/tested lines are in FORMAL_INPUT_A10HHeN2345
+
+1) NII should be roughly OK. When Norbert P. will release his new NII model
+atom, we will incorporate this. Here, we recommend the following lines 
+(part of which are commented out in FORMAL_INPUT) to be compared with the
+observations (but see below, 'contamination').
+
+3994.9970
+4447.0330 
+4601.4700 
+4607.1600 
+4621.3900
+4630.5400 
+4643.0900 
+5005.1500
+5007.3300 
+5045.1030
+5666.6300
+5676.0149
+5679.5540 
+5710.7657
+5941.6500
+
+2) for dwarfs, NIII-V should be also OK, though NV could be tested only for
+few stars with low resolution. Please see the included comparison for tau
+Sco (tau_sco.ps). We obtain exactly the same abundance as Norbert P. in his
+recent paper, with the only difference that we need a Teff of 500 K hotter.
+green: obs (high resol, from a project with Nevy and Salvo Scuderi) 
+black: 'new' solar 
+red: N=8.17 (Norbert P, from NII alone: N=8.16)
+
+3) the major discrepancy is for the NIII emission lines from giants and
+supergiants. For a couple of stars, we found good agreement with the other
+lines, but for most of the objects the lines are somewhat too weak. We
+suspect (after a multitude of tests regarding ionization and collision cross
+sections), that our model atom might need at least one principal quantum
+number more. This might feed the upper level of the emission line
+transition(s) indirectly over 4f.
+
+Anyway, please note that the strength of the emission depends considerably
+on beta (in the usual way, as for Halpha).
+
+However, to implement the additional levels in a consistent way (preliminary
+tests are under way) will take some time, and Jorge, who is working on
+this, needs to do something different for the next three months. So, you can
+implement all routines related to Nitrogen and begin with the comparisons,
+but don't put too much stress on the NIII lines. (BTW, Paco's cmfgen lines
+are mostly consistent with ours, except for the cooler objects where he has
+somewhat more emission).
+
+The most reliable lines from our present tests are the quartet lines NIII
+4510/15/18, which you should consider as primary abundance indicators.
+
+3) Regarding NIV, the strategic emission line (4058) from Paco is stronger
+than ours, but for no object so far we had problems with our predictions.
+
+There is also a nice NIV line around 6380. Please note that on the 'left' side
+(approx. 6378.5) there is a feature (stronger and narrower -50 km/s- than NIV)
+which we cannot identify. Does somebody know where this feature comes from?
+(Please tell us). This feature overlaps with the NIV line for larger vsini or
+bad resolution, giving the impression that the predicted NIV line is too weak.
+
+4. Overall, it seems that the majority of the supergiants (Gal and LMC) are
+strongly overabundant, by factors between 5 and 10 (one time even more). A
+nice example is HD14947 (O5I), which can be fitted nicely for ALL NIII-lines
+indicating an overabundance of 10. Accounting for the problem with the NIII
+lines and that our fit predicts a bit too much NIV, a factor between 5 to 10
+is more probable.
+
+5. Here is a list of blends which can contaminate the N-lines (particularly
+and as usual, from OII)
+
+NII (only in blue range, for red range, check yourself)
+4447    OII4448 (low f-value)
+4601    OII4602
+4607    OII4609
+4630    (SiIV 4631, improbable, but just in case ...)
+4643    OII, NIII 4641
+
+NIII
+4097    H-delta, OII 4097 !!!
+4195/4200 HeII 4200
+4510    NeII 4511 (two comp.)
+4515    CIII 4515/16 (two comp, low f-value)
+4640    OII 4638  (problematic for O9 and cooler)
+4641    OII 4641 (even more probematic), NII 4643
+
+Note that on the left of NIII 4634, there is a strong OIV (emission) line,
+which might overlap in the wings, and there is also the SiIV line 4631
+
+NIV
+6380   unknown feature at 6378.5
+
+
+Please report any problems to Jorge and me. Finally, please note that
+all publications etc. based on this model atom (or improvements) should
+include Jorge as co-author. 
+
+
+Happy fitting, Jo.

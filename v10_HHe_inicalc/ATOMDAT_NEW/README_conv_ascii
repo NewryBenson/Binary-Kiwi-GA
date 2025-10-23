@@ -1,0 +1,7 @@
+for nlte_approx below 7 compile conv_ascii.f and run it. 
+
+for nlte_approx ge 7 compile conv_ascii_add_HHelines.f90 and run it
+nl3_add_HHelines used (correct upper levels) 
+nl3_add_HHelines_v1 only for specific tests (upper level = 0)
+
+should end with message "success"

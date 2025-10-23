@@ -1,0 +1,42 @@
+LINE: HALPHA    
+           1 restwave   6560.21070008641     HeII
+           2 restwave   6562.79984109833     H
+LINE: HBETA     
+           1 restwave   4859.40023069899     HeII
+           2 restwave   4861.32388135743     H
+LINE: HGAMMA    
+           1 restwave   4338.74239255215     HeII
+           2 restwave   4340.46293839511     H
+LINE: HDELTA    
+           1 restwave   4100.10712388157     HeII
+           2 restwave   4101.73469830249     H
+LINE: HEPS      
+           1 restwave   3968.49601417422     HeII
+           2 restwave   3970.07340686091     H
+LINE: HEII4200  
+           1 restwave   4199.90009107470     HeII
+LINE: HEII4541  
+           1 restwave   4541.66558040587     HeII
+LINE: HEII4686  
+           1 restwave   4685.84775807826     HeII
+LINE: HEII6406  
+           1 restwave   6406.45459734757     HeII
+LINE: HEII6527  
+           1 restwave   6527.17494800397     HeII
+LINE: HEII6683  
+           1 restwave   6678.15100000000     HeI
+           2 restwave   6683.27882230476     HeII
+LINE: HEI4026   
+           1 restwave   4025.66646494788     HeII
+           2 restwave   4026.21932845876     HeI
+LINE: HEI4387   
+           1 restwave   4387.92981870215     HeI
+LINE: HEI4471   
+           1 restwave   4471.51333524866     HeI
+LINE: HEI4713   
+           1 restwave   4713.20000000000     HeI
+LINE: HEI4922   
+           1 restwave   4921.93087181913     HeI
+LINE: HEI6678   
+           1 restwave   6678.15100000000     HeI
+           2 restwave   6683.27882230476     HeII

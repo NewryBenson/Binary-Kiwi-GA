@@ -1,0 +1,171 @@
+:T VSINI
+0.
+
+:T LINES TO BE SOLVED, NUMBER OF COMPONENTS, LEVELS, LINE-NUMBER 
+:T AND STARK BROADENING OPTION
+
+HALPHA    2  H12    H13  0  1   HE24 HE26  0  1
+HBETA     2  H12    H14  0  1   HE24 HE28  0  1
+HGAMMA    2  H12    H15  0  1   HE24 HE210 0  1
+HDELTA    2  H12    H16  0  1   HE24 HE212 0  1
+:THDELTA    4  H12    H16  0  1   HE24 HE212 0  1  N38 N310  1  2 N38 N310  2  2
+HEPS      2  H12    H17  0  1   HE24 HE214 0  1
+
+HEII1640  4  HE22   HE23 0  1  C4_9 C4_19   1  2   C4_9 C4_19  2  2  
+             C4_9 C4_19 3 2
+:T HEII4200  3  HE24   HE211 0  1  N313 N322  1  2  N313 N322  2  2
+HEII4200  1  HE24   HE211 0  1
+HEII4541  1  HE24   HE29  0  1
+HEII4686  1  HE23   HE24  0  1
+:T HEII4686a  5  HE23   HE24  0  1  HE12P3 HE14S3  0  1
+:T             N310 N311  1  2  N310 N311  2  2  N310 N311  3  2
+HEII5411  1  HE24   HE27  0  1
+HEII6406  1  HE25   HE215 0  1
+HEII6527  1  HE25   HE214 0  1
+HEII6683  2  HE25   HE213 0  1  HE12P1 HE13D1 0  1 
+HEI4026   2  HE12P3 HE15D3 0  1 HE24 HE213 0  1
+HEI4387   1  HE12P1 HE15D1 0  1
+HEI4471   1  HE12P3 HE14D3 0  1
+HEI4713   1  HE12P3 HE14S3 0  1
+HEI4922   1  HE12P1 HE14D1 0  1
+HEI6678   2  HE12P1 HE13D1 0  1  HE25   HE213 0  1
+
+HEI4120   1  HE12P3 HE15S3 0  1
+HEI4143   1  HE12P1 HE16D1 0  1
+
+HEI5048   1  HE12P1 HE14S1 0  1   
+HEI5875   1  HE12P3 HE13D3 0  1 
+
+:T Carbon Lines
+:T
+:T-------- Carbon II lines
+:T
+:T Miguel A. Urbaneja - 2023.05.14 
+:T Definitions for line file LINES_A10HHeCnewNOSi_new_coll.dat, 
+:T corresponding to model atom A10HHeCnew.dat
+:T 
+:T DEFINITION OF CARBON II LINES
+:T VACUUM WAVELENGTHS 
+CII1335  3  C2_1   C2_3    1  2  C2_1   C2_3    2  2  
+        C2_1   C2_3    3  2 
+CII1036  2  C2_1   C2_4    1  2  C2_1   C2_4    2  2  
+CII1010  3  C2_2   C2_8    1  2  C2_2   C2_8    2  2  
+        C2_2   C2_8    3  2  
+CII1760  3  C2_3   C2_7    1  2  C2_3   C2_7    2  2  
+        C2_3   C2_7    3  2 
+CII1324  4  C2_3   C2_10   1  2  C2_3   C2_10   2  2 
+        C2_3   C2_10   3  2  C2_3   C2_10   4  2 
+CII1066  3  C2_3   C2_15   1  2  C2_3   C2_15   2  2  
+        C2_3   C2_15   3  2 
+:T AIR WAVELENGTHS
+CII6578  1  C2_6   C2_7    1  2 
+CII6582  1  C2_6   C2_7    2  2 
+CII3920  2  C2_7   C2_11   1  2  C2_7   C2_11   2  2  
+CII7231  1  C2_7   C2_9    1  2  
+CII7237  2  C2_7   C2_9    2  2  C2_7   C2_9    3  2 
+CII5890  3  C2_9   C2_12   1  2  C2_9   C2_12   2  2  
+        C2_9   C2_12   3  2 
+CII4267  2  C2_9   C2_16   1  2  C2_9   C2_16   2  2  
+CII6527  1  C2_12  C2_20   1  2  
+CII6530  2  C2_12  C2_20   2  2  C2_12  C2_20   3  2  
+CII5333  1  C2_12  C2_23   1  2 
+CII5335  1  C2_12  C2_23   2  2  
+CII6780  2  C2_13  C2_24  1  2  C2_13  C2_24  2  2  
+CII6784  1  C2_13  C2_24  3  2  
+CII6787  1  C2_13  C2_24  4  2  
+CII6791  1  C2_13  C2_24  5  2  
+CII6798  1  C2_13  C2_24  6  2  
+CII6801  1  C2_13  C2_24  7  2  
+CII6812  1  C2_13  C2_24  8  2  
+CII5641  1  C2_13  C2_31  1  2  
+CII5648  1  C2_13  C2_31  2  2  
+CII5662  1  C2_13  C2_31  3  2  
+CII5133  2  C2_13  C2_33  4  2  C2_13  C2_33  5  2  
+CII5137  1  C2_13  C2_33  6  2  
+CII5139  1  C2_13  C2_33  7  2  
+CII5143  1  C2_13  C2_33  8  2  
+CII5145  1  C2_13  C2_33  9  2  
+CII5151  1  C2_13  C2_33 10  2  
+:T WAVELENGTH FROM MOORE
+CII6462  1  C2_16  C2_29   1  2  
+:T WAVELENGTHS FROM KURUCZ & PEYTREMANN
+CII6151  2  C2_14  C2_28   1  2  C2_14  C2_28   2  2  
+
+:T-------- Carbon III lines
+:T UV LINES BELOW
+
+CIII4056    1 C3_24 C3_44  1  2
+
+CIII4070    2 C3_20 C3_39  1  2  C3_20 C3_39 2  2
+
+:T component 4 at 4156.74 missing; in case,  ADD!
+:T CIII4152    1 C3_23 C3_43  1  2
+:T CIII4155    3 C3_23 C3_43  1  2  C3_23 C3_43 2 2  C3_23 C3_43 3 2 
+:T CIII4156    2 C3_23 C3_43  1  2  C3_23 C3_43 2 2 
+:T CIII4157    2 C3_23 C3_43  2  2  C3_23 C3_43 3 2
+
+CIII4162    1 C3_23 C3_43 3 2
+
+:T JO -- lower level changed
+CIII4186    1 C3_21 C3_40  1  2
+
+CIII4647    1 C3_7  C3_10   1  2
+CIII4650    1 C3_7  C3_10   2  2 
+CIII4651    1 C3_7  C3_10   3  2 
+CIII465051   2 C3_7 C3_10   2  2  C3_7  C3_10 3  2
+CIII46475051 3 C3_7 C3_10   1  2  C3_7  C3_10 2  2  C3_7  C3_10 3  2
+
+CIII4665    2 C3_13 C3_26   1  2  C3_13 C3_26 2  2
+
+:T CIII5250    2 C3_24 C3_35   1  2  C3_13 C3_25 2  2
+:T CIII5249    1 C3_24 C3_35   1  2
+
+:T CIII5253    1 C3_13 C3_25   2  2
+:T CIII5272    1 C3_13 C3_25   1  2
+
+CIII5696    1 C3_9  C3_12   1  2
+
+CIII5826    1 C3_24 C3_34   1  2
+
+:T CIII6731    1 C3_13 C3_23   2  2 
+
+CIII6744    1 C3_13 C3_23   1  2
+
+CIII8500    1 C3_8  C3_9    1  2
+
+:T-------- Carbon IV lines
+
+:T CIV5015     2 C4_11 C4_15   1  2  C4_11 C4_15 2  2 
+:T too weak and close to HeI 5015
+:T CIV5016     1 C4_11 C4_15   1  2
+
+CIV5018     1 C4_11 C4_15   2  2
+
+CIV5801     1 C4_3  C4_4    1  2
+CIV5811     1 C4_3  C4_4    2  2
+CIV580111   2 C4_3  C4_4    1  2  C4_3  C4_4   2  2
+
+:T-------- Carbon UV lines
+CIII1176  6  C3_2  C3_4  1  2  C3_2  C3_4  2  2  C3_2  C3_4  3  2
+             C3_2  C3_4  4  2  C3_2  C3_4  5  2  C3_2  C3_4  6  2
+
+CIII1247    1 C3_3  C3_6   1  2
+
+:T CIII1308    1 C3_6  C3_9   1  2
+
+CIII1620  6  C3_10  C3_19  1  2  C3_10  C3_19  2  2  C3_10  C3_19  3  2
+             C3_10  C3_19  4  2  C3_10  C3_19  5  2  C3_10  C3_19  6  2
+
+CIV1169   3  C4_5  C4_9   1   2   C4_5  C4_9  2   2  C4_5  C4_9  3    2
+
+CIV1550   2  C4_1  C4_2   1   2   C4_1  C4_2  2   2
+
+:T Several blends
+:T CIII1176 + CIV1169
+C1173bl   9 C3_2  C3_4  1  2  C3_2  C3_4  2  2  C3_2  C3_4  3  2
+            C3_2  C3_4  4  2  C3_2  C3_4  5  2  C3_2  C3_4  6  2
+            C4_5  C4_9  1  2  C4_5  C4_9  2  2  C4_5  C4_9  3  2
+:T HEII1640 + CIII1620
+HEC1630bl 7 HE22   HE23 0  1  C3_10  C3_19  1  2  C3_10  C3_19  2  2  
+           C3_10  C3_19 3  2  C3_10  C3_19  4  2  C3_10  C3_19  5  2  
+           C3_10  C3_19  6  2

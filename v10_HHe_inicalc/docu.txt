@@ -1,0 +1,901 @@
+         HOW TO UNDERSTAND AND TO USE FASTWIND (f90 version)
+	 ______________________________________________________________
+
+This docu is valid for versions nlte_8.5.2/higher and nlte_approx_5.3.4/higher 
+
+The major difference to previous versions is the possibility to
+calculate a consistent T-structure (on basis of electron-collisions) and
+the presence of a new atomic data base (-> ATOMDAT_NEW).
+
+There is also the possibility to include clumping in an approximate way
+(See discussion in nlte.f90)
+
+Also changed: abundances can be changed now directly from the INDAT.DAT file
+            : solar abundances from file ATOMDAT_NEW/abundan_solar
+
+
+From version 9.0 on:
+we use a default value of 51 instead of 47 grid points
+(older versions)
+
+the number of freq. points is automatically calculated in dimes.f90
+
+a variety of clumping laws is suggested in subroutine CLUMPING (nlte.f90)
+
+From version 10.0 on:
+Lots of changes. To go back to the v9 version, set new options (module
+nlte_opt, in nlte.f90) to .false. See newrelease.text (note that there will
+remain few differences due to, e.g., different frequency grids)
+
+For experienced users familiar with the code until v9: read at least
+the IMPORTANT NOTES at the end of this docu, regarding the choice 
+of Hopf-parameters and calculating additional models with changed
+metallic abundances but same stellar/wind parameters and YHE.
+
+
+I. Philosophy
+_____________
+
+The code is completey data driven and uses DETAIL data structure.
+
+
+II. directories
+_______________
+
+main directory: nlte
+
+                should contain, after copying from inicalc
+		              * idl procedures to plot results
+                              * file HOPFPARA_ALL_HHe (see below)
+                              * file HOPFPARA_ALL_met (see below)
+
+
+subdirectory: inicalc (where all the original stuff resides)
+              
+             contains 
+	                       * detail.ps: a comprehensive description of the
+	                         structure of the (explicit) atomic models 
+
+             contains ATOMDAT_NEW (changed compared to previous versions) 
+
+                               * atomnl2_meta (for nlte_approx below v6.0)
+			         (which is now called atomnl2_meta_v1.0)
+			         
+				 OR
+				 
+			       * atomnl2_meta_v2.0 (for nlte_approx v6.0 and higher)
+			       
+			       * atomcol
+			       * atomgf3
+                               * generalinfo
+                               * partit
+                               * abundan_solar (which is actually used) 
+			       * abundan_solar_old ("old" values)
+			       * abundan_solar_new ("new" values, following Asplund et al)
+			       
+                               * files for metal-lines (see III. below)
+
+                               * atomnldr (data for DR, from v10 on)
+
+              required if background metal-opacities are calculated
+
+
+              contains DATA   
+                               * LINES**.dat  metal line broadening
+			       
+			         ** = Si data for Silicon (old model) 
+                                 ** = N2345 data for Nitrogen (old/new model)
+			         and other possibilities
+				 
+                               * thom_new.dat   H/He broadening (actual vers.)
+                    	       * U2B.dat     U2 functions for inversion
+			       * U2L1.dat 
+                               * U2L2.dat 
+                               * U2S.dat 
+                               * utablag.dat  U functions
+                               * utablak.dat 
+
+              contains OP_DATA_NEW 
+
+                               * ionization cross sections from OP
+
+
+              contains programs
+	                       * current version in newprog
+
+subdirectories: astars, obstars etc, to be created
+
+                    will contain, *after copying*:
+		             all program (see below) and data files
+                             that it needs to calculate models, occupation
+			     numbers, fluxes and profiles
+
+                    in particular the Makefile (for intel)
+		    
+		    install all *programs* with make install
+		    		    
+		    the following f90-files (all from "newprog")  
+                              * nlte_type.f90
+			      * dimes.f90
+			      * ffr.f90
+                              * princesa.f90
+			      * nlte.f90
+			      * nlte_approx.f90
+			      * preformal.f90
+			      * formalsol.f90
+			      * totout.f90			      
+
+                    the following data files
+		    
+		              * **.dat  
+			        ** = A10HHe, A10HHeSi, A10HHeN2345
+                               			      
+                    and the user supplied input files			      
+
+                              * INDAT.DAT (for nlte)
+			      * FORMAL_INPUT_A10HHe (for formal integral)
+                                     "      _A10HHeSi 
+                                            _A10HHeN2345
+                                      
+				
+			 	one of those (depending on the atomic model) 
+				has to be copied to a file named FORMAL_INPUT
+
+every new model is calculated in a subdirectory below astars, (o)bstars, 
+and all the calculated data are stored there.
+
+Note: it is no longer necessary to have more than one subdirectory per
+ATOMIC MODEL, except for logistical reasons
+
+Note also that the file METAL_RESTART can be deleted if no restart is needed.
+(this file is particularly large)
+
+III. Generation of binary line-files
+_____________________________________
+
+In order to create the required binary line-files, change to directory
+inicalc/ATOMDAT_NEW and proceed as indicated in README_conv_ascii
+
+Usually, you can use the provided binary files 
+
+  nl3a_all (wavelength)
+  nl3g_all (gf values)
+  nl3i_all (inices)
+  nl3info_all (file-structure)
+  
+directly.
+
+IV. Generation of executable objects
+_____________________________________
+
+0. Specific things
+
+   If you want to calculate without (additional) approximate Helium
+   uncomment the line jatom(2)=0 in nlte_approx.f90, subr. atomdat
+   (This has no influence on the exact treatment, and is required only
+   in those cases when there should be no Helium at all, i.e. neither in
+   the exact case)
+
+   If you want to allow outer electron temperatures below 0.4 Teff,
+   change the parameter TMIN1 in nlte.f90, MODULE tcorr_var 
+    
+   If you want to use different stratifications of clumping factors,
+   modify subroutine CLUMPING in nlte.f90
+
+   IN ANY CASE, copy EITHER file abundan_solar_new OR abundan_solar_old
+   to file abundan_solar in inicalc/ATOMDAT_NEW
+
+   If you want to change these abundances additionaly, 
+   change abundan_solar
+
+   IF YOU WANT TO CALCULATE DWARFS WITH LARGER GRAVITIES, IT MIGHT
+   BE USEFUL TO USE MORE PHOTOSPHERIC GRID POINTS THAN USUAL. CHANGE
+   THE CORRESPONDING LINES (ND, NP) IN dimes.90
+
+1. If you want to change the location of data files. 
+
+   NORMAL USERS:
+   leave them where they are, i.e. in inicalc/DATA and inicalc/ATOMDAT_NEW;
+   goto 2. 
+
+   if you really want to change the locations:
+   
+   a. edit the file nlte.f90: 
+          
+	  change the parameter 'fpath' (in the uppermost part of the file)
+	  to the actual location (either relative or absolut) where
+	  you have located the directory DATA 
+
+   b. edit the file nlte_approx.f90: 
+          
+	  change the parameter 'fpath' (in the uppermost part of the file)
+	  to the actual location (either relative or absolut) where
+	  you have located the directory ATOMDAT_NEW 
+
+   c. edit the file preformal.f90 
+
+	  change the parameter 'fpath' (in the uppermost part of the file)
+	  to the actual location (either relative or absolut) where
+	  you have located the directory DATA 
+
+
+2. edit the Makefile with respect to the compile options of your
+          local f90-compiler (in particular, the optimization) and the
+	  default atomic model
+
+
+
+3. Choose your specific DETAIL data-set
+		       
+          examples are A10HHe.dat         H/He
+					  
+		       A10H__.dat           
+		                          contains only H-atom (A-stars)
+
+		       A11HHe.dat              
+		                          as A10HHe, but with different
+					  cbb rates for hydrogen
+					  (following Butler & Przybilla)
+                                          use at own risk (see discussion 
+					  in Repolust et al. 2005)
+
+                       A10HHeSi.dat           
+		                          explicit Si-Atom (old) included
+
+                       A10HHeN2345.dat           
+		                          explicit N-Atom (old NII, rest new) 
+					  included
+
+   ***Don't forget to update the default metallicity!***
+   IF no abundance for the explicit ions is provided in INDAT.DAT,
+   the value from Axxx.dat will be used! (Only for He, a value is always
+   required, so that the He abundance in the detail input file does not
+   need to be changed).
+   IF there is a specific abundance in INDAT.DAT for an element which is
+   not treated explicitly, only the corresponding back-ground abundance is
+   changed. See also below. 
+   
+
+4. run 'make install' to install all program (source) files
+
+   run  'make ATOM=file' or simply 'make', where file is the name of your 
+   DETAIL data-set (see 3.) WITHOUT the extension '.dat'
+
+   If you want to change your model-atom (i.e., you have created already
+   executable objects from a specific detail file, and now want to use
+   another detail file), first 'make clean'. This will delete all object
+   and module files refering the to deprecated atomic model.
+
+   this will create the following executable objects:
+   
+   pnlte_A***.eo      (for nlte)
+   pformalsol_A***.eo (for formal integral)
+   ptotout_A***.eo    (for inspection of models)
+
+   Note, that a number of additional objects (.o) and modules (.mod) are
+   created
+
+   Look into the Makefile. Modify the default atomic model, AND the
+   corresponding LINES_***.dat file
+
+
+V. Running the nlte code
+_________________________
+
+To run the code the following input file must be present
+
+                  INDAT.DAT
+
+in case you calculate without consistent T-structure, or want to use 
+excellent start values for Te(r), you need
+
+                  HOPFPARA_ALL_HHe and/or        
+		  HOPFPARA_ALL_met (in ../nlte)
+                  
+
+INDAT.DAT
+
+the structure is as follows
+
+abcde                          name of subdirectory where model will be stored
+                               (maximum 30 characters) 
+			       
+T  T  n1  n2                   first logical var. OPTNEUPDATE: usually T
+                               if F, electron densities remain as in LTE
+                               second for calculating He I: 
+			       for Astars T (only dummy)
+                               for Bstars T
+                               for O stars T or F
+			       n1+1 : number of NLTE iteration when code 
+			              starts
+			              0 at beginning
+			       n2: number of iterations to be carried out
+                                   typically 100
+                               IMPORTANT NOTE: if performing some ADDITIONAL
+			       iterations, 
+			      *in the case of Sobolev-treatment
+        		       n1 has to be greater/equal 3. 	       
+			      *in the case of CMF-treatment
+        		       n1 has to be greater/equal 20. 	
+			       
+1. or 0.                       optmixed = true (1.) or false (0.)
+                               controls whether all (0.) or only most important
+			       (1.) lines are calculated in CMF. Presently,
+			       set this number always to 0.
+			       
+T_eff      log g    R/R_sun    real numbers
+
+Rmax/Rstar Tmin/Teff           normally 120. and .6 (this is the minimum
+                               temp. for the INITIAL T-stratification (but see above)
+
+Mdot vmin vinf beta vtrans     choose 0.1 (km/s) for vmin (starting value)
+                                      0.1 (in units of vsound) for vtrans
+				      (should lead to smoot transition around 
+				      sonic point, check by
+				      plotting v(r) or rho(r))
+                               Note that in certain cases the input value of 
+			       vtrans does NOT comply with the value actually used! 
+			       (if a smooth transition is not possible). 
+			       If such a case happens, it is logged in file FASTWIND.LOG
+				      
+
+N(He)/N(H)  XIHE               XIHE=no. of electrons provided by helium nucleus
+                                  =starting value for models
+				  =0.0 (A-stars), 1.0 (B-stars), 2.0 (O-stars)
+
+F  F  F  T  T                  1st: F remains
+                               2nd: F  nlte hopf function used
+                                                 HOPFPARA required
+		                    T  modified Lucy-approx. for 
+					         temperature used
+                                       if you calculate with consistent
+				       T-structure and have no Hopf-parameters
+				       available, this is a possibility
+                               3rd: F standard
+			          : T file "megasalida" is generated
+			       4th: T forward extrapolation of n_i
+			            to accelerate convergence
+				    F if acceleration does not work
+	                       5th: T CMF-treatment after 20th iteration
+			            F only Sobolev treatment, starting after 
+				    3rd iteration 
+				    
+vturb, metallicity LINES LIM   in km/s and in solar abundance units 
+                               metallicity: 0 F F -> no metal background
+
+                               metallicity > 0: 
+			       metal abundances (only not specified elements) 
+			       are scaled to the input value with respect to 
+			       the original solar MASS fraction:
+			       0.1, e.g., means that the (total) 
+			       new metallicity corresponds to a tenth of the 
+                               corresponding total solar metal mass fraction.
+			       (relative abundances remain as solar)
+			       
+			       metallicity < 0: 
+			       metal abundances (only not specified elements) 
+			       are scaled to the input value (abs) with 
+			       respect to the original solar NUMBER fractions:
+			       0.1, e.g., means that each new abundance  
+			       corresponds to a tenth of the original solar
+                               number fraction.
+			       
+			       NOTE: As long as the metallicity mass fraction
+			       is small, the difference in the resulting 
+			       abundances of both approaches is also small as
+			       long as the He-content is solar! In other cases,
+			       I suggest to use a positive value, however
+                               note that this is only a compromise! For more
+                               questions concerning this problem, please 
+			       contact the author. 
+			       
+			       It might be useful to play around with some
+			       numbers and study the output carefully: 
+
+                               The complete abundance output (in number and
+			       mass fractions) is logged in file ABUNDAN,
+			       which is created almost just after the start
+			       of the code.
+
+
+                               LINES T: with approximate line-blocking
+			       LIM   T: approximate line-blocking also in
+			                model (-> tau_ross, lower boundary
+					consistent)
+                                     F: only bf/ff metallic opacities in
+                                        model; use this only for test cases
+
+ENATCOR,EXPANSION,SET_FIRST,SET_STEP  ENATCOR enables T-correction scheme,
+T, F, 1, 2                     if TRUE.                     
+                               EXPANSION includes adiabatic cooling (to be
+			       implemented in future versions, not working
+                               so far (set as FALSE)
+			       SET_FIRST iteration number where corr. scheme
+			       shall start (suggested 1, beginning with SA)
+			       SET_STEP  each SET_STEP iteration the temperature
+                               is updated. We suggest a value of 2, use 3 in
+                               problematic cases
+                               NOTE: check variable TMIN1 in module
+                               nlte.f90/tcorr_var whether it fits your problem
+
+
+CLF,VCLSTART,VCLMAX            The stratification of the clumping factor is
+                               assumed to be linear, starting at VCLSTART and
+			       reaching its maximum value at VCLMAX. 
+			       Both velocities are in units of vinf.
+			       Inside  from VCLSTART, no clumping is assumed, 
+			       and outside from VCLMAX the clumping factor remains 
+			       at its maximum value.  
+			       
+			       CLF is this maximum value, which also corresponds
+			       (in the present approach) to the ENHANCEMENT factor. 
+			       CLF = 2, e.g., means that the density in the clumps is
+                               twice as high as the given Mdot would imply. 
+			       
+			       The interclump medium is always assumed to be void.
+			       For rho^2 mass-loss diagnostics, corresponding
+			       processes remain almost unaffected as long as
+			       Mdot * clf^(0.5) remains conserved.
+                               
+			       To calculate UNCLUMPED models, set these
+                               parameters, e.g., to 
+			       CLF=1., VCLSTART= 0.1 and VCLMAX = 0.2
+			       
+			       To calculate a model with an (almost) constant
+			       clumping factor in the wind, set, e.g.,
+			        
+			       CLF=9., VCLSTART = 0.05 and VCLMAX = 0.1
+			       
+			       All rho^2 diagnostics corresponds then roughly
+			       to an unclumped Mdot of three times the input value.
+			       (for more details, see subroutine CLUMPING).
+                               	       
+			       Note that the user can provide own clumping laws,
+			       by manipulating the subroutine CLUMPING in nlte.f90.
+			       Up to 10 input parameters are possible
+
+HOPFSELF  T OR F               If TRUE, Hopfparameters are taken from file
+                               "../HOPFPARA_ALL_xxx", where xxx=HHe for 
+			       abs(metallicity < 0.2) and xxx=met else.
+			       Note, that this option
+			       requires presently that Teff, log g and YHE
+                               ly exactly on the specified grid. If FALSE,
+                               you have to provide an extra line with
+			       HOPFparameters
+q_inf, q_0, gamma              if HOPFSELF = .FALSE.
+
+
+These parameters are used in Subroutine tlucy. The formula applied for the 
+determination of the planeparallel NLTE Hopf function is
+
+       q(Tau)=q_inf - (q_inf - q_0)*exp(-gamma*tau)
+       
+       
+The file ../HOPFPARA_ALL_HHe(met) contains 
+
+q_inf, q_0,  gamma                 actual data to be used in first row
+
+q_inv, q_0,  gamma       T_eff, log g    3rd and more rows as storage
+  .
+  .
+  .
+(definition of parameters with IDL-routine qhopf.pro).  
+These quantities are read from the code in subroutine "tlucy"
+
+EL1  modified abundance1      (these lines can, but must not be present)
+EL2  modified abundance2      using these specifications, one avoids to
+....                          modify the DETAIL input file
+                              EL element to be specified as in file
+                              abundan_solar, only CAPITALS
+			      
+			      these lines (if present) refer to
+			      prespecified abundances (explicit and 
+			      background elements), EXCEPT FOR He, which
+			      always has to be specifed in the corresponding
+			      line below the wind parameters.
+ 
+                              if explicit element, abundance from DETAIL 
+			      input file (check!!!) will be overwritten
+                              if background element, rescaled solar abundance 
+			      will be overwritten
+
+                              input RELATIVE TO HYDROGEN and 
+			      ALWAYS LOGARITHMICALLY
+                              either with respect to H=12 (positive number)
+                              or directly, log10(abund/H), i.e., negative
+
+                              if log10(abund/H) gt 0 (e.g., for Y > 1), 
+			      use only first possibility (with respect to H=12), 
+			      since positive numbers always interpreted 
+			      in this way
+
+                              NOTE THAT THESE NUMBERS WILL BE USED DIRECTLY, 
+			      i.e., NOT RENORMALIZED IN ROUTINE ABUNDAN
+
+                              example1: SI   -4.00
+			      means that SI has explicit and/or background
+			      element will be used with an abundance (relative
+			      to H) of 1.e-4
+			      example2: Si    8.0
+			      has the same meaning.
+			      
+
+As soon as all files are prepared and INDAT.DAT is specified, you can run the code by
+
+           pnlte_A10HHe.eo
+   or      pnlte.A10HHe.eo >filename
+   
+In the latter case the output that normally appears on the screen is written
+into the file named filename.
+
+If
+      n1=0  n2=0
+                  in file INDAT.DAT, then only the hydrodynamic model
+		  atmosphere is generated together with one LTE iteration.
+		  
+Otherwise the code proceeds from iteration n1 to n1+n2 and generates output.
+If the corrections fall below a certain threshold, then
+
+           FINAL ITERATION
+	   
+with corresponding output. Note
+
+                            N(J,K) J= ionization stage
+			           K= element number
+				   
+			    TRAD= radiation temperature related to inner radius
+			    TRAD1=                    related to tau'=2/3
+                                  (for def. of tau', see paper) 
+                            RTHIN= radius from which H_nue(r) prop 1/r**2
+			    LTHIN= depth point of RTHIN
+			    
+			    
+IMPORTANT NOTE: if you want to restart a model with CONVERGED T-structure
+(ENATCOR = TRUE) and force the code to perform additional T-corrections,
+you have to delete the file MAXTCORR.dat manually (see below)
+
+
+V. nlte model output
+____________________
+
+pnlte.eo generates the following files in the subdirectory 'abcde'
+
+IMPORTANT NOTE: in addition to the files below, a number of scratch files
+are generated in the tmp directory. Be careful to set the relevant
+environment variable (usually TMPDIR) to a local disk to avoid any
+delay due to net-activity
+
+name             typ             content
+
+FASTWIND.LOG     ASCII           program versions, accuracy of photosp.
+		 		 structure, modification of vtrans if required
+
+ABUNDAN          ASCII           used abundances for background elements, both
+		 		 by number and by mass
+
+CONT_FORMAL      binary          opacities, emissivities
+CONT_FORMAL_ALL  binary          opacities,emissivities,J_nue,Thomson-parameter
+CONVERG          ASCII           convergence properties from n1 to n1+n2
+CONVERG_METALS   ASCII           convergence properties of metal background from n1 to n1+n2
+                                 (from v10 on)
+ENION            binary          NLTE ionization fractions, n_e (NLTE)
+FLUXCONT         ASCII           F_nue, TRAD,TRAD1,RTHIN, fluxconservation
+INDAT.DAT        ASCII           (almost) copy from actual input file
+LTE_POP          binary          
+MAX_CHANGE       ASCII           book-keeping of convergence and acceleration
+                                 properties
+METAL_IONS       ASCII           ionization fraction of metals (metals ne 0)
+METAL_RESTART    binary          for restart (metals ne 0), can be deleted 
+MODEL            binary           
+NLTE_POP         binary
+TAU_ROS          ASCII           tau_r, n_e(LTE)
+TEMP             binary          
+METAL_IDL        ASCII           optionally created if debug=3 in nlte_approx;
+                                 metal ionization fractions
+
+DELTAT_TC_LA.dat                 all these ASCII files give information
+DERIVATIVES_TC_LA.dat            concerning the (last) T_correction and are
+ENERDIFF_TC_LA.da                self-explanatory
+ENERGY_TC_LA.dat
+
+MAXTCORR.dat     ASCII           convergence of T-correction
+
+
+
+VII. Looking at nlte model output
+________________________________
+
+
+the file to handle nlte output is
+
+      ptotout_A10HHe.eo
+      
+      
+STEP 1 we run the program by
+
+       ptotout_A10HHe.eo
+                             MODELNAME    abcde
+	
+       generates in model subdir with name abcde output file OUT_TOT
+						
+
+STEP 2
+
+we go back to main directory nlte.
+
+OUT_TOT can be read by IDL procedure
+                                      readmod.pro
+the command				      
+	     readmod,'astars/abcde/OUT_TOT','name',shortname
+	     
+generates IDL arrays  that can be read by several IDL routines.
+name will appear on plots as header.
+
+the arrays are
+
+shortname.r  .v  .dvdr  .rho  .p  .t  .xne  .taur  .m  .levnames (level names)
+
+         .dep  .ifrac  .lam  .fnue  .trad (corresponds to TRAD1) .hnue
+	 
+         .fcl (from version 9.x on)  clumping factor
+
+
+PLOT OF MODEL STRUCTURE
+suppose that two models have shortnames a1 and a2. Then the IDL plot commands
+
+plv,a1 plrho,a1 plt,a1 plxne,a1 plp,a1 plifrac,a1
+
+will produce nice plots with header 'name' of these arrays as function of
+either r, taur or m. The routines will ask you about your preferred x-axis.
+
+You can always overplot by
+
+          oplot,a2.taur,a2.v
+	       ,a2.r,a2.v
+	       ,a2.r,a2.v      etc.
+	       
+Instead of these plot commands you can use the usual
+
+          plot,a1.taur,a1.v
+	  
+but then you will have standard cuts and no titles and headers.
+
+
+PLOT OF IONIZATION FRACTIONS FOR METALS
+
+if METAL_IDL present (requires debug=3 in nlte_approx), the ionization
+fractions of the (approximate) metal ions can be plotted, in analogy to
+plifrac; the command, however, is
+
+plifrac_met,cat,a1   
+
+
+where cat is the catalog containing the actual model (i.e., the METAL_IDL
+file)
+
+PLOT OF SOURCE FUNCTION
+the line source function in units of TRAD is plotted by
+
+         plsic,a1
+	            give lower level: 1 (corresponds to n=2)
+                         upper      : 2 (n=3)
+			              3 (n=4)
+				      4 (n=5)
+				      
+PLOT OF DEPARTURE COEFFICIENTS
+use the routines
+                         pldep,a1
+			 pldepn,a1,deph,dephe
+			 
+PLOT OF FLUX
+the energy distribution function is plotted by
+
+        plflux,a1
+	oplot,a2.lam,a2.fnue
+
+PLOT OF EDDINGTON FLUX (rescaled to R(tau=2/3)
+
+        plhnue,a1
+
+	
+VIII. Calculating the formal integral
+____________________________________
+
+There are four files required
+
+   pformalsol_A10HHe.eo   code for formal integral (as many lines as desired)
+   
+   FORMAL_INPUT          input file of atomic data for formalsol
+   
+   thom_new.dat          line broadening file 
+
+   LINES.dat             line data for metals (as specified in ATOM_FILE,
+                         created by Makefile)
+			 
+
+Note: There is another file, ATOMFILE, which is automatically generated from
+the makefile (whenever the DETAIL file has been changed). It contains the
+names of the detail file and the corresponding LINES file.
+
+The only input file
+
+FORMAL_INPUT
+      
+is selfexplanatory according to the example given in the directories 
+astars etc. 
+
+Some useful level designations for HeI/II are
+
+HeI 4026  HEI2P3 HEI5N3 blended with HE24 HE213 (A7HHe)
+HeI 4026  HEI2P3 HEI5D3 blended with HE24 HE213 (A10HHe)
+
+
+HeI 4387  HEI2P1 HEI5N1 (A7HHe)
+HeI 4387  HEI2P1 HEI5D1 (A10HHe)
+
+HeI 4471  HEI2P3 HEI4D3 
+HeI 4922  HEI2P1 HEI4D1
+
+HeII 4200 HE24 HE211
+HeII 4541 HE24 HE29
+HeII 4686 HE23 HE24 
+
+The run of pformalsol.eo 
+then generates two (local) files per treated line, namely
+
+      STARK.BIN
+      IX.DAT
+
+Note, that all wavelengths are corrected for terrestrial refraction.
+
+if it happens that you don't know the parameters of model 'a1234' anymore
+
+                     ptotout_A10HHe.eo
+		     
+		     will give you info
+
+Note also, that the profiles are stored within the catalog with the
+appropriate name and an ending describing the value of vturb and
+whether you have calculated with our without correct e-scat. redistribution
+function. In case of no ending, escat = false and vturb = 0. have been
+calculated
+
+Short comment on broadening options
+
+0 Doppler broadening alone
+1 Broadening either from tables (thom_new.dat) for Linear Stark, BCS, ISO
+  and ISO1 lines
+
+  if no entries are found in the tables, and the element is H or HeII,
+  Stark-broadening according to Griem is calculated (useful for IR lines)
+
+2 Voigt broadening according to LINES.DAT (requires Gamma_L and Gamma_C
+  values to be provided there)
+
+3 Voigt broadening with approximated Gamma_L and Gamma_C values. Does not
+  need additional parameters. All values are calculated from the specified
+  levels and atomic model
+  
+NOTE: Presently, there is no option for the quadratic Stark effect!  
+  
+
+IX. Looking at and plotting profiles
+______________________________________
+
+This is done in main directory nlte using IDL.
+
+INDIVIDUAL PROFILES
+
+          halpha,'astars/a1234/OUT.HALPHA'
+                                  .HBETA'
+				  .HGAMMA'
+          halpha,'(o)bstars/a1234/OUT.HEI4471'
+                                     .HEII4200' etc. 
+
+or
+          halpha,'astars/a1234/OUT.HALPHA,vsini=150   convolves with vsini 
+or
+                                         ,x,y,vsini=150 keeps unconvolved
+					                profile in x,y
+							
+COMPARISON WITH OBSERVATION
+
+oplot,xobs,yops
+
+
+PLOT AND PRINT OF H_ALPHA, _BETA, _GAMMA
+
+note that the routines hprof, heiprof, heiiprof and irprof
+have been updated to allow for a more flexible comparison of models!!!!
+
+          hprof,'astars/a1234','title',vsini=150.,ps='file.ps'
+
+/ps, when ps-file shall be generated
+vsini = number only, when convolution required.
+
+vmacro (in km/s) is calculated according to RT model by Gray
+
+Analogue routines are 
+
+          hheprof,'(o)bstars/a1234','title',vsini=150.,ps='file.ps' (old version only)
+          heiprof,'(o)bstars/a1234','title',vsini=150.,ps='file.ps'
+          heiiprof,'(o)bstars/a1234','title',vsini=150.,ps='file.ps'
+          plot_all,'(o)bstars/a1234','title',vsini=150.,ext='extension'
+
+          where extension is the VT-extension of the profiles (no ext = '0')
+
+          irprof, ... (standard: use layout=8)
+          si2prof,
+	  si3prof,
+
+Convolution with gaussion via option "resol=" is also possible.
+
+Convolution with RT macro-turbulence via option "vmacro=" is also possible.
+
+Comparison with oberservations can be also performed. Look into the
+procedure with path "/comp".
+
+If you run these procedures, you have to run at first "convol" via
+
+run convol
+
+
+**IMPORTANT NOTES**
+
+-------------------------------------------------------------------------
+
+FROM V10 ON: in this case, if you use UPDATE_STRUCT = .TRUE. (default),
+the hydro-structure is iterated (once) to obtain a consistent ne-structure
+
+In this case, the Hopf-parameters do no longer need to be chosen as carefully
+as before, and rough values are sufficient. 
+
+Daring people might even use Lucy's T-structure for the start (2nd logical 
+parameter in the row with 5 logical parameters set to T), at their own risk.
+
+To check your first run, use A10HHe.dat and the sample INDAT-file for
+A3030. Compare your results with the comparison model as calculated
+by the author, contained in A3030.tgz
+
+If you compare this particular model with older results, you will see
+larger differences in HeII, but the rest is consistent. 
+
+The reason for these differences is the new T and ne structure. Only for
+dwarfs (or other with weak winded models) in the T-range between 30 to 35 kK
+such a change should occur.
+
+
+HOW TO CALCULATE THE EFFECTS OF AN ABUNDANCE CHANGE OF ONLY *FEW* METALS
+(stellar/wind parameters and *YHE* do not change)
+
+This can be accomplished by few additional iterations:
+i) copy your old model to a new directory
+ii) in the INDAT.DAT file, 
+    - change the model name according to the new dir
+    - set ITLAST to 20 or larger,
+    - change the abundance according to your desire
+iii) restart the model, i.e., execute pnlte_A10***.eo
+iv) calculate, for the new model, OUT_TOT and the profiles
+
+When the model is restarted, the model structure (T, rho) remains unchanged.
+In previous versions, also the metallic background (except for the continuum
+of the explicit elements) has been kept constant, and only the CMF/continuum 
+iterations for the explicit elements were performed.
+
+From v10.1 on, this has been changed: Now, if the changes in abundance are
+larger than 20%, the background is re-iterated as well, to consistently 
+account for the *line*-blocking effects of the modified elements.
+
+Anyway, since the model no longer changes (the effects of metal abundance
+changes on T and rho are discarded), and H/He are almost not affected, the
+convergence is fast, and for such a restarted model only order of 15
+iterations are required (compared to a complete model, which needs 40 to 60
+iterations) 
+
+In those cases where you change a multitude of metallic abundances, calculate
+a new model, since then the effect on T and rho can no longer be neglected!
+
+If you change YHE and restart the model, you will get a stop, since then
+the density would be significantly affected.
+
+Have fun, Jo Puls 

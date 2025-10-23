@@ -1,0 +1,30 @@
+:T
+:T Lines.dat: Version compatible to FASTWIND data set CNOMgSi
+:T
+:T Notes: 
+:T	  i. Oscillator strengths are gij fj/Sum(gi), check for consistency
+:T         required
+:T	 ii. Last two columns correspond to Number of line and Sum(gi) 
+:T 	iii. Wavelengths are wavelengths in air
+:T	 iv. Both damping constants are divided by 4pi 
+:T	  v. The multiplet is identified by the NIST database number. 
+:T	 vi. Radiative lifetimes from VALD/NIST databases
+:T	vii. Collisional damping from VALD or according to Cowly (1971)
+:T
+:T Setup: Miguel A. Urbaneja
+:T Last revision: 17/12/2002
+:T
+:V2
+:T
+:T
+:T *******************************************************************
+:T         OXYGEN   OVI
+:T********************************************************************
+:T
+   CL   TY  RBB    2    7  RBB
+:T
+:T collisional damping approximated (as for PV)
+O6_1  O6_2  1  1031.91   0.133   3.24E7  0.     0.    2.65E-8   2.
+O6_1  O6_2  2  1037.61   0.066   3.24E7  0.     0.    2.65E-8   2.
+0
+THEEND
