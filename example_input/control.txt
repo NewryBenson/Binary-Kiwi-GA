@@ -1,5 +1,5 @@
-nind  		          127             # number of models per generation
-ngen 		          30              # number of generations
+nind  		          12             # number of models per generation
+ngen 		          10              # number of generations
 
 # Detailed parameters controlling population size
 f_gen1                2.365            # nind in first gen = nind*f_gen1

@@ -29,9 +29,9 @@ import population as pop
 import cluster_inputs as ci
 
 jobscriptfile = 'run_kiwiGA.job' # name of job script file
-hours_str = ci.max_wall_time # maximum wall time -- but see below!
+minutes_str = ci.max_wall_time # maximum wall time -- but see below!
 walltime_flex = True # adjust maximum wall time depending on ngen
-hrs_gen = ci.time_per_gen # hours per generation if walltime_flex
+mins_gen = ci.time_per_gen # minutes per generation if walltime_flex
 n_cpu_core = ci.cores_per_node  # number of CPUs per node
 username = ci.username
 codedir = ci.codedir  # 'Kiwi-GA'
@@ -144,7 +144,7 @@ print("\nnind = " + str(ctrldct["nind"]))
 print("ngen = " + str(ctrldct["ngen"]))
 
 if walltime_flex:
-    hours_str = str(int(math.ceil(float(ctrldct["ngen"])*hrs_gen)))
+    minutes_str = str(int(math.ceil(float(ctrldct["ngen"])*mins_gen)))
 
 printsection("FW version")
 # Check version 10 vs 11
@@ -985,10 +985,9 @@ else:
 
 jobscript = f"""#!/bin/bash
 #SBATCH --job-name={run_name}
-#SBATCH --time {hours_str}:00:00
-#SBATCH -N {str(n_node)}
-#SBATCH --ntasks-per-node={ci.cores_per_node}
-#SBATCH --no-requeue
+#SBATCH --time={minutes_str}
+#SBATCH --ntasks={ci.cores_per_node}
+#SBATCH --cpus-per-task=1
 {ci.extra_sbatch % (run_name, run_name)}
 
 runname={run_name}

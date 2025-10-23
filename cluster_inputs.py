@@ -8,7 +8,7 @@ Make sure the right settings are chosen and the correct modules are imported.
 username = "sanderv"
 codedir = "Binary-Kiwi-GA"
 cores_per_node = 48
-max_wall_time = "7"  # In hours, this has to be a string.
+max_wall_time = "7"  # In minutes, this has to be a string.
 time_per_gen = 1.1  # in hours
 scratch_loc = "/scratch/sanderv/"
 home_loc = "/home/sanderv/"
